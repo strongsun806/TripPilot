@@ -48,9 +48,20 @@ from core_rag import (
     get_currency_and_cost_info,
     compare_destinations,
     get_monthly_packing_and_weather,
+    safe_md,
 )
 
 load_dotenv()
+
+# 마크다운 내 물결표(~) 범위 표기 시 GFM 취소선(----) 파싱 및 글자 취소선 오작동 방지 래퍼
+_orig_st_markdown = st.markdown
+
+def _safe_st_markdown(body, *args, **kwargs):
+    if isinstance(body, str):
+        body = safe_md(body)
+    return _orig_st_markdown(body, *args, **kwargs)
+
+st.markdown = _safe_st_markdown
 
 # 1. 페이지 기본 설정
 st.set_page_config(
@@ -459,6 +470,13 @@ def inject_theme_css_and_background(vibe_mode: str, dest_name: str) -> None:
                 min-width: 100% !important;
                 flex: 1 1 100% !important;
             }
+        }
+
+        /* 물결표(~) 범위 표기 시 GFM strikethrough 오작동으로 인한 텍스트 가로줄(----) 완전 무효화 */
+        del, s, strike {
+            text-decoration: none !important;
+            color: inherit !important;
+            background: transparent !important;
         }
 
         /* 히어로 배너 (네이처 웨이브) */
@@ -1697,6 +1715,13 @@ def inject_theme_css_and_background(vibe_mode: str, dest_name: str) -> None:
                 min-width: 100% !important;
                 flex: 1 1 100% !important;
             }
+        }
+
+        /* 물결표(~) 범위 표기 시 GFM strikethrough 오작동으로 인한 텍스트 가로줄(----) 완전 무효화 */
+        del, s, strike {
+            text-decoration: none !important;
+            color: inherit !important;
+            background: transparent !important;
         }
 
         /* 히어로 배너 (사이버 네온) */

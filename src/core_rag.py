@@ -44,6 +44,25 @@ llm = ChatOpenAI(
 CITE_REGEX = re.compile(r"\[근거\s*([\d,\s]+)\]")
 
 
+def safe_md(text: str) -> str:
+    """
+    마크다운 렌더링 시 물결표(~)가 2개 이상 들어갈 때
+    GFM 취소선(strikethrough: ~~텍스트~~ 또는 ~텍스트~)으로 파싱되어
+    글씨에 취소선(----)이 그어지고 물결표가 소실되는 현상을 완벽 방지합니다.
+    코드 블록(```...```)을 제외한 일반 텍스트 구간의 물결표(~)를 전각 물결표('～')로 변환합니다.
+    """
+    if not isinstance(text, str) or "~" not in text:
+        return text
+    parts = re.split(r'(```[\s\S]*?```|`[^`\n]+`)', text)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            result.append(part)
+        else:
+            result.append(part.replace("~", "～"))
+    return "".join(result)
+
+
 # ── 1. LangGraph 상태(State) 정의 (다단계 Multi-Hop RAG 지원) ──
 class RAGState(TypedDict):
     trip_id: str                        # 선택된 여행지 ID
@@ -650,7 +669,7 @@ def query_trip_pilot(
 
     result = rag_app.invoke(initial_state)
     return {
-        "answer": result["answer"],
+        "answer": safe_md(result["answer"]),
         "cited_sources": result["cited_sources"],
         "all_contexts": result["context_docs"],
         "expanded_queries": result.get("expanded_queries", []),
@@ -876,12 +895,12 @@ def generate_itinerary(
         if plan_b_tip:
             md_lines.append(f"- **우천/돌발 대비 플랜 B**: {plan_b_tip}")
 
-    answer_md = "\n".join(md_lines)
-    bot_msg = structured_plan.get("bot_message") or (
+    answer_md = safe_md("\n".join(md_lines))
+    bot_msg = safe_md(structured_plan.get("bot_message") or (
         f"🐣 짜잔! **{dest_name}**의 위키백과 정보와 기본 제원을 바탕으로 맞춤 2박 3일 여행 일정과 동선 지도를 완성했어! [근거 1]\n\n"
         f"**오른쪽 플래너 창**에서 `1일차` · `2일차` · `3일차` 탭을 눌러가며 지도 동선과 숙소·구글맵 링크를 확인해 봐! "
         f"혹시 **'2일차는 늦잠 모드로 바꿔줘'** 라거나 **'비 올 때 실내 코스로 바꿔줘'** 같은 요청이 있으면 나한테 바로 말해줘! ✈️💛"
-    )
+    ))
 
     combined_for_citations = f"{bot_msg}\n{answer_md}"
 
@@ -1372,10 +1391,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "¥",
         "krw_rate": 9.2,
         "sample_amt": 1000,
-        "coffee": "약 400~550엔 (3,700~5,000원)",
-        "meal": "약 900~1,500엔 (8,300~13,800원)",
-        "taxi": "약 500~600엔부터 (4,600원~)",
-        "water": "약 110~130엔 (1,000~1,200원)",
+        "coffee": "약 400～550엔 (3,700～5,000원)",
+        "meal": "약 900～1,500엔 (8,300～13,800원)",
+        "taxi": "약 500～600엔부터 (4,600원～)",
+        "water": "약 110～130엔 (1,000～1,200원)",
     },
     "대한민국": {
         "lang": "한국어",
@@ -1384,8 +1403,8 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "₩",
         "krw_rate": 1.0,
         "sample_amt": 10000,
-        "coffee": "약 4,500~6,000원",
-        "meal": "약 9,000~15,000원",
+        "coffee": "약 4,500～6,000원",
+        "meal": "약 9,000～15,000원",
         "taxi": "기본 4,800원부터",
         "water": "약 1,000원",
     },
@@ -1396,10 +1415,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "$",
         "krw_rate": 1380.0,
         "sample_amt": 10,
-        "coffee": "약 $5~7 (6,900~9,700원)",
-        "meal": "약 $18~35 (25,000~48,000원, 팁 별도)",
-        "taxi": "Uber 기본 $10~15 (14,000원~)",
-        "water": "약 $2~3 (2,800~4,100원)",
+        "coffee": "약 $5～7 (6,900～9,700원)",
+        "meal": "약 $18～35 (25,000～48,000원, 팁 별도)",
+        "taxi": "Uber 기본 $10～15 (14,000원～)",
+        "water": "약 $2～3 (2,800～4,100원)",
     },
     "영국": {
         "lang": "영어",
@@ -1408,8 +1427,8 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "£",
         "krw_rate": 1780.0,
         "sample_amt": 10,
-        "coffee": "약 £3.5~5 (6,200~8,900원)",
-        "meal": "약 £15~28 (26,700~49,800원)",
+        "coffee": "약 £3.5～5 (6,200～8,900원)",
+        "meal": "약 £15～28 (26,700～49,800원)",
         "taxi": "블랙캡 기본 £3.8부터",
         "water": "약 £1.5 (2,700원)",
     },
@@ -1420,10 +1439,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "€",
         "krw_rate": 1500.0,
         "sample_amt": 10,
-        "coffee": "약 €2.5~4.5 (3,750~6,750원)",
-        "meal": "약 €16~30 (24,000~45,000원)",
+        "coffee": "약 €2.5～4.5 (3,750～6,750원)",
+        "meal": "약 €16～30 (24,000～45,000원)",
         "taxi": "기본 €7.5부터",
-        "water": "약 €1.5~2.5 (2,250~3,750원)",
+        "water": "약 €1.5～2.5 (2,250～3,750원)",
     },
     "이탈리아": {
         "lang": "이탈리아어",
@@ -1432,10 +1451,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "€",
         "krw_rate": 1500.0,
         "sample_amt": 10,
-        "coffee": "에스프레소 약 €1.2~2.5 (1,800~3,750원)",
-        "meal": "약 €14~26 (21,000~39,000원)",
+        "coffee": "에스프레소 약 €1.2～2.5 (1,800～3,750원)",
+        "meal": "약 €14～26 (21,000～39,000원)",
         "taxi": "기본 €5부터",
-        "water": "약 €1~2 (1,500~3,000원)",
+        "water": "약 €1～2 (1,500～3,000원)",
     },
     "스페인": {
         "lang": "스페인어",
@@ -1444,10 +1463,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "€",
         "krw_rate": 1500.0,
         "sample_amt": 10,
-        "coffee": "카페 콘 레체 약 €1.5~2.5 (2,250~3,750원)",
-        "meal": "타파스/메누 델 디아 약 €12~22 (18,000~33,000원)",
+        "coffee": "카페 콘 레체 약 €1.5～2.5 (2,250～3,750원)",
+        "meal": "타파스/메누 델 디아 약 €12～22 (18,000～33,000원)",
         "taxi": "기본 €4.5부터",
-        "water": "약 €1~1.8 (1,500~2,700원)",
+        "water": "약 €1～1.8 (1,500～2,700원)",
     },
     "독일": {
         "lang": "독일어",
@@ -1456,10 +1475,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "€",
         "krw_rate": 1500.0,
         "sample_amt": 10,
-        "coffee": "약 €3~4.5 (4,500~6,750원)",
-        "meal": "약 €14~25 (21,000~37,500원)",
+        "coffee": "약 €3～4.5 (4,500～6,750원)",
+        "meal": "약 €14～25 (21,000～37,500원)",
         "taxi": "기본 €4.5부터",
-        "water": "약 €1.5~2 (2,250~3,000원)",
+        "water": "약 €1.5～2 (2,250～3,000원)",
     },
     "스위스": {
         "lang": "독일어/프랑스어",
@@ -1468,10 +1487,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "CHF",
         "krw_rate": 1580.0,
         "sample_amt": 10,
-        "coffee": "약 CHF 5~7 (7,900~11,000원)",
-        "meal": "약 CHF 25~45 (39,500~71,000원)",
+        "coffee": "약 CHF 5～7 (7,900～11,000원)",
+        "meal": "약 CHF 25～45 (39,500～71,000원)",
         "taxi": "기본 CHF 7부터",
-        "water": "약 CHF 3~4 (4,700~6,300원)",
+        "water": "약 CHF 3～4 (4,700～6,300원)",
     },
     "태국": {
         "lang": "태국어",
@@ -1480,10 +1499,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "฿",
         "krw_rate": 38.0,
         "sample_amt": 100,
-        "coffee": "약 50~90바트 (1,900~3,400원)",
-        "meal": "로컬 60~120바트 (2,300~4,500원)",
-        "taxi": "볼트/그랩 기본 40~50바트 (1,500원~)",
-        "water": "약 10~15바트 (400~600원)",
+        "coffee": "약 50～90바트 (1,900～3,400원)",
+        "meal": "로컬 60～120바트 (2,300～4,500원)",
+        "taxi": "볼트/그랩 기본 40～50바트 (1,500원～)",
+        "water": "약 10～15바트 (400～600원)",
     },
     "베트남": {
         "lang": "베트남어",
@@ -1492,8 +1511,8 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "₫",
         "krw_rate": 0.055,
         "sample_amt": 100000,
-        "coffee": "약 30,000~55,000동 (1,650~3,000원)",
-        "meal": "쌀국수 약 45,000~80,000동 (2,500~4,400원)",
+        "coffee": "약 30,000～55,000동 (1,650～3,000원)",
+        "meal": "쌀국수 약 45,000～80,000동 (2,500～4,400원)",
         "taxi": "그랩 기본 15,000동부터",
         "water": "약 10,000동 (550원)",
     },
@@ -1504,9 +1523,9 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "NT$",
         "krw_rate": 43.0,
         "sample_amt": 100,
-        "coffee": "약 60~90 TWD (2,600~3,900원)",
-        "meal": "야시장/우육면 90~180 TWD (3,900~7,700원)",
-        "taxi": "기본 85 TWD부터 (3,650원~)",
+        "coffee": "약 60～90 TWD (2,600～3,900원)",
+        "meal": "야시장/우육면 90～180 TWD (3,900～7,700원)",
+        "taxi": "기본 85 TWD부터 (3,650원～)",
         "water": "약 20 TWD (860원)",
     },
     "싱가포르": {
@@ -1516,10 +1535,10 @@ COUNTRY_LANG_CURRENCY = {
         "symbol": "S$",
         "krw_rate": 1050.0,
         "sample_amt": 10,
-        "coffee": "약 S$4~7 (4,200~7,350원)",
-        "meal": "호커센터 S$6~10 / 레스토랑 S$20~40",
+        "coffee": "약 S$4～7 (4,200～7,350원)",
+        "meal": "호커센터 S$6～10 / 레스토랑 S$20～40",
         "taxi": "그랩 기본 S$4.5부터",
-        "water": "약 S$1.5~2 (1,500~2,100원)",
+        "water": "약 S$1.5～2 (1,500～2,100원)",
     },
 }
 
@@ -1733,14 +1752,14 @@ def compare_destinations(trip_a: Dict[str, Any], trip_b: Dict[str, Any]) -> Dict
 
 
 def get_monthly_packing_and_weather(dest_name: str, country: str, month: int) -> Dict[str, Any]:
-    """선택한 출발 월(1~12월)에 따른 여행지 계절 날씨, 옷차림 가이드 및 추천 추가 준비물"""
+    """선택한 출발 월(1～12월)에 따른 여행지 계절 날씨, 옷차림 가이드 및 추천 추가 준비물"""
     # 북반구 / 남반구 / 열대 기후 구분
     is_tropical = any(c in country for c in ["태국", "베트남", "필리핀", "싱가포르", "말레이시아", "인도네시아", "하와이", "괌", "사이판", "몰디브"])
     is_southern = any(c in country for c in ["호주", "뉴질랜드", "칠레", "아르헨티나", "남아프리카"])
 
     if is_tropical:
         season_type = "우기 (스콜 주의)" if month in [6, 7, 8, 9, 10] else "건기 (화창·여행 최적)"
-        temp_desc = "평균 28℃~34℃ 내외의 고온 다습한 열대 기후"
+        temp_desc = "평균 28℃～34℃ 내외의 고온 다습한 열대 기후"
         clothes = "통풍이 잘되는 린넨/면 반팔 & 반바지, 실내 강한 에어컨 대비 얇은 바람막이나 가디건"
         checklist_extra = [
             "휴대용 3단 우산 또는 방수 우비",
@@ -1752,35 +1771,35 @@ def get_monthly_packing_and_weather(dest_name: str, country: str, month: int) ->
     elif is_southern:
         if month in [12, 1, 2]:
             season_type = "여름 (야외 액티비티 성수기)"
-            temp_desc = "평균 22℃~30℃의 따스한 여름 햇살"
+            temp_desc = "평균 22℃～30℃의 따스한 여름 햇살"
             clothes = "가벼운 반팔, 모자, 선글라스, 저녁 바닷바람 대비 얇은 겉옷"
             checklist_extra = ["자외선 차단제", "수영복/래시가드", "선글라스", "보충 보조배터리"]
         elif month in [6, 7, 8]:
             season_type = "겨울 (온화한 쌀쌀함)"
-            temp_desc = "평균 6℃~15℃의 서늘하고 쌀쌀한 날씨"
+            temp_desc = "평균 6℃～15℃의 서늘하고 쌀쌀한 날씨"
             clothes = "도톰한 니트, 경량 패딩, 머플러, 긴바지"
             checklist_extra = ["경량 패딩", "보온 내의", "따뜻한 양말", "보습 립밤"]
         else:
             season_type = "봄/가을 (쾌적한 온도)"
-            temp_desc = "평균 14℃~22℃의 쾌적한 여행 날씨"
+            temp_desc = "평균 14℃～22℃의 쾌적한 여행 날씨"
             clothes = "긴팔 티셔츠, 셔츠, 얇은 자켓 또는 가디건"
             checklist_extra = ["휴대용 우산", "편한 워킹화", "가벼운 외투"]
     else:
         # 일반 북반구 (한국, 일본, 유럽, 북미 등)
         if month in [12, 1, 2]:
             season_type = "겨울 (설경 & 크리스마스 시즌)"
-            temp_desc = "평균 -5℃~8℃의 춥고 건조한 겨울 날씨 (설경 명소는 영하권)"
+            temp_desc = "평균 -5℃～8℃의 춥고 건조한 겨울 날씨 (설경 명소는 영하권)"
             clothes = "보온 패딩 또는 울 코트, 기모 이너웨어, 목도리, 장갑"
             checklist_extra = [
                 "붙이는 핫팩 & 주머니 핫팩",
-                "보온 내의(히트텍) 2~3벌",
+                "보온 내의(히트텍) 2～3벌",
                 "방한 장갑 & 넥워머",
                 "눈길 대비 미끄럼 방지 방한화/부츠",
                 "고보습 핸드크림 및 립밤",
             ]
         elif month in [6, 7, 8]:
             season_type = "여름 (축제 & 바캉스 시즌)"
-            temp_desc = "평균 24℃~32℃의 무덥고 햇살이 강한 여름"
+            temp_desc = "평균 24℃～32℃의 무덥고 햇살이 강한 여름"
             clothes = "시원한 반팔, 민소매, 반바지, 냉방용 얇은 셔츠"
             checklist_extra = [
                 "미니 손선풍기 (손풍기)",
@@ -1790,12 +1809,12 @@ def get_monthly_packing_and_weather(dest_name: str, country: str, month: int) ->
             ]
         elif month in [3, 4, 5]:
             season_type = "봄 (벚꽃 & 신록 시즌)"
-            temp_desc = "평균 10℃~20℃의 따사롭고 일교차 큰 환절기"
+            temp_desc = "평균 10℃～20℃의 따사롭고 일교차 큰 환절기"
             clothes = "트렌치코트, 자켓, 니트, 레이어드 가능한 겉옷"
             checklist_extra = ["일교차 대비 겉옷/스카프", "꽃가루/황사 대비 마스크", "인공눈물", "편한 스니커즈"]
         else:
             season_type = "가을 (단풍 & 여행 최적기)"
-            temp_desc = "평균 12℃~21℃의 청명하고 쾌적한 가을 하늘"
+            temp_desc = "평균 12℃～21℃의 청명하고 쾌적한 가을 하늘"
             clothes = "가디건, 라이더 자켓, 블레이저, 가벼운 니트"
             checklist_extra = ["카메라/삼각대 (인생샷용)", "가벼운 머플러", "휴대용 보조배터리"]
 
