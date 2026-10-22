@@ -19,24 +19,25 @@ WIKI_CACHE_PATH = os.path.join(DATA_DIR, "wiki_cache.json")
 META_COLLECTION = "travel_meta"
 WIKI_COLLECTION = "travel_wiki"
 
-# 3. API 및 모델 설정 (NF2003 보안 관리)
-GMS_DEFAULT_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/"
+# 3. API 및 모델 설정 (보안 및 호환성 관리)
+DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
 
 
 def get_api_key() -> str:
-    return (os.getenv("GMS_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
+    return (os.getenv("OPENAI_API_KEY") or os.getenv("GMS_KEY") or "").strip()
 
 
 def get_base_url() -> str:
-    raw_url = (os.getenv("OPENAI_BASE_URL") or GMS_DEFAULT_URL).strip()
-    # .env에 https://gms.ssafy.io/api/v1 입력 시 실제 SSAFY GMS OpenAI 호환 프록시 경로로 자동 보정
-    if raw_url.rstrip("/") == "https://gms.ssafy.io/api/v1":
-        return GMS_DEFAULT_URL
+    raw_url = (os.getenv("OPENAI_BASE_URL") or DEFAULT_API_BASE_URL).strip()
+    # 프록시 기본 엔드포인트 입력 시 실제 OpenAI 호환 프록시 경로로 자동 보정 지원
+    clean = raw_url.rstrip("/")
+    if clean.endswith("/api/v1") and "gms" in clean:
+        return clean.replace("/api/v1", "/gmsapi/api.openai.com/v1/")
     return raw_url
 
 
 def get_wiki_contact() -> str:
-    return (os.getenv("WIKI_CONTACT") or "ssafy_travel@example.com").strip()
+    return (os.getenv("WIKI_CONTACT") or "trippilot_contact@example.com").strip()
 
 
 EMBEDDING_MODEL = "text-embedding-3-small"

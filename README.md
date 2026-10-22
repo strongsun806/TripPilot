@@ -1,107 +1,206 @@
-# ✈️ TripPilot (트립파일럿) — 글로벌 여행지 추천 및 일정 생성 RAG 서비스
+<div align="center">
 
-> **SSAFY AI 코어 프로젝트 2회차** — 전 세계 인기 여행지 100곳 메타데이터(`travel_meta`)와 한국어 위키백과 백과사전 문서(`travel_wiki`)를 결합한 **LangGraph 기반 이중 컬렉션 RAG 도메인 지식 서비스**
+# ✈️ TripPilot (트립파일럿)
+### AI 여행 코파일럿 '토리'와 함께하는 인텔리전트 글로벌 여행 플래너
+
+<img src="assets/pilot_tori.jpg" width="180" alt="Pilot Tori Mascot" style="border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" />
+
+<br/>
+
+**전 세계 인기 여행지 메타데이터(`travel_meta`)와 한국어 위키백과 백과사전 문서(`travel_wiki`)를 결합한<br/>LangGraph 기반 이중 컬렉션 RAG 도메인 지식 여행 비서**
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](#)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.30%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](#)
+[![LangChain](https://img.shields.io/badge/LangGraph-RAG%20Workflow-green.svg?logo=langchain&logoColor=white)](#)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange.svg)](#)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991.svg?logo=openai&logoColor=white)](#)
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
+
+</div>
 
 ---
 
-## 1. 프로젝트 개요 및 도메인 선정 이유
+## 📸 서비스 시연 화면 (Demonstration)
 
-### 왜 글로벌 여행 & 일정 도메인에서 RAG가 필수적인가? (`근거 없이 답하면 무엇이 문제가 되는가`)
-1. **가짜 관광지(Hallucination) 및 타 지역 랜드마크 혼동 방지**: 순수 LLM이 근거 없이 2박 3일 여행 일정을 생성하면 수백 km 떨어진 다른 도시의 명소를 하루 코스에 섞거나 존재하지 않는 장소를 지어내어 현지에서 여행자의 시간·비용 손실 및 조난 위험을 초래합니다.
-2. **지역별 건기/우기·몬순·남반구 계절 역전 오안내 방지**: 같은 동남아라도 다낭(건기 2~5월), 방콕(건기 11~2월), 발리(건기 4~10월)는 우기·태풍 시기가 완전히 다르며, 우유니 소금사막처럼 우기(12~3월)에 '하늘 거울'을 볼 수 있는 특수 지형은 정확한 문서 근거 없이는 안내가 틀리기 쉽습니다.
-3. **고산병 위험 고도(마추픽추 2,430m, 우유니 3,656m) 및 예산 규모의 정확한 검증**: 건강 안전 및 여행 경비 규모(`100만원 이하` vs `300만원 이상`)를 메타데이터와 위키백과 원문 근거(`[근거 N]`)로 투명하게 제시합니다.
+### 1. 메인 대시보드 & 자연 공감 뷰파인더
+> 여행지 메타데이터 카드, 4대 공간 감성 테마, 고화질 힐링 명소 뷰파인더 및 실시간 현지 물가·환율 시뮬레이터
+<div align="center">
+  <img src="docs/images/01_dashboard_main.png" width="95%" alt="TripPilot Main Dashboard" />
+</div>
+
+<br/>
+
+### 2. 파일럿 토리와의 여행 라운지 & 실시간 동선 플래너
+> 백그라운드 병렬 추론 기반의 대화형 일정 수정(원클릭 프리셋), 인터랙티브 지도, 동행자 올인원 공유 허브
+<div align="center">
+  <img src="docs/images/02_interactive_planner.png" width="95%" alt="TripPilot Interactive Planner" />
+</div>
+
+<br/>
+
+### 3. 일자별(Day-by-Day) 분할 동선 지도 & PDF 리포트
+> 전체 일정이 뭉쳐 보이던 핀 겹침 현상을 해결하고, Day별 독립 경로선과 마커를 렌더링하는 고해상도 PDF 내보내기
+<div align="center">
+  <table width="100%">
+    <tr>
+      <td width="60%" align="center">
+        <b>🗺️ 일자별 최적화 동선 지도 (Day 1~2 코스)</b><br/>
+        <img src="docs/images/04_route_map.jpg" width="100%" alt="Route Map" />
+      </td>
+      <td width="40%" align="center">
+        <b>📄 맞춤형 한글 PDF 일정표 출력</b><br/>
+        <img src="docs/images/03_pdf_itinerary.png" width="85%" alt="PDF Export" />
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 
-## 2. 디렉터리 구조 및 산출물 안내
+## 🌟 핵심 기능 (Key Highlights)
+
+1. **🕊️ 전담 마스코트 '파일럿 토리' & 웜 오트밀/바이오필릭 UI**
+   - 귀여운 3D 룩 병아리 비행 조종사 토리가 여행 코치로 동행
+   - 자연 친화적인 웜 오트밀 & 포레스트 그린 컬러 팔레트로 시각적 피로도 최소화
+
+2. **⚡ 무중단 백그라운드 병렬 추론 엔진 (`src/background_inference.py`)**
+   - Streamlit의 UI 렌더링 생명주기와 AI 추론 루프를 스레드 워커로 분리
+   - 사용자가 탭을 전환하거나 다른 옵션을 클릭해도 백그라운드에서 추론이 끊김 없이 지속
+
+3. **🗓️ 자유로운 여행 기간 설정 (당일치기 ~ 30일 한달살기)**
+   - 2박 3일 고정 일정을 넘어 `1박 2일 ~ 최대 29박 30일(한달살기)`까지 슬라이더로 맞춤 기간 설정 지원
+
+4. **🗺️ Day-by-Day 독립 동선 지도 생성 (`src/pdf_route_map.py`)**
+   - 다일정 여행 시 장소 핀과 선이 한 지도에 뭉치지 않도록 일자별로 깔끔하게 분리 렌더링
+
+5. **📱 모바일 QR 웹 일정표 & 올인원 내보내기 (`src/publish_mobile_itinerary.py`)**
+   - 스마트폰 기본 카메라로 QR 코드를 스캔하면 반응형 모바일 웹 일정표로 바로 연결
+   - PDF 일정표, 웹 가이드북(HTML), 캘린더 등록(.ics), 마크다운(.md) 내보내기 지원
+
+6. **🧠 LangGraph 기반 이중 컬렉션 RAG (F2001 ~ F2016)**
+   - **travel_meta**: 전 세계 100개 주요 도시 메타데이터 벡터 색인
+   - **travel_wiki**: 한국어 위키백과 실시간 수집 및 청킹(1,000자 / 200자 중복) 색인
+   - **가드레일 & 팩트체크**: 허위 관광지(Hallucination) 방지 및 근거 출처(`[근거 N]`) 표기
+
+---
+
+## 🏗️ 시스템 아키텍처
+
+```mermaid
+flowchart TD
+    User([사용자 / 여행자]) --> UI[Streamlit 웹 애플리케이션 app.py]
+    
+    subgraph UI_Features [사용자 인터페이스 & 편의 기능]
+        UI --> Viewfinder[자연 공감 뷰파인더 & 물가 시뮬레이터]
+        UI --> Lounge[파일럿 토리 라운지 & 실시간 플래너]
+        UI --> ExportHub[올인원 내보내기 PDF / QR / ICS / MD]
+    end
+
+    subgraph Async_Engine [병렬 추론 워커]
+        Lounge --> BgWorker[Background Inference Worker src/background_inference.py]
+    end
+
+    subgraph LangGraph_RAG [LangGraph RAG 파이프라인]
+        BgWorker --> RetrieveNode[Retrieve 노드]
+        RetrieveNode --> ChromaMeta[(ChromaDB: travel_meta)]
+        RetrieveNode --> ChromaWiki[(ChromaDB: travel_wiki)]
+        RetrieveNode --> MergeFilter[중복 제거 및 MMR 다양성 재순위화]
+        MergeFilter --> GenerateNode[Generate 노드: GPT-4o-mini]
+        GenerateNode --> Guardrail[가드레일 검증 및 근거 표기 파싱]
+    end
+
+    Guardrail --> ItineraryPlan[구조화된 맞춤 여행 일정 데이터]
+    ItineraryPlan --> RouteMapGen[일자별 분할 지도 렌더러 src/pdf_route_map.py]
+    ItineraryPlan --> MobileWebPub[모바일 웹 퍼블리셔 src/publish_mobile_itinerary.py]
+    RouteMapGen --> PDF[최종 한글 PDF 생성]
+```
+
+---
+
+## 📂 프로젝트 디렉터리 구조
 
 ```text
 ai_pjt_2_trippilot/
-├── app.py                            # [UI 영역] Streamlit 메인 웹 애플리케이션 (F2009 ~ F2012, F2014)
-├── requirements.txt                  # 필수 패키지 버전 명세
-├── .env.example                      # 환경변수 설정 템플릿 (NF2003)
-├── .gitignore                        # .venv/, .env, chroma_db/, __pycache__/ 제외
+├── app.py                            # Streamlit 메인 애플리케이션
+├── requirements.txt                  # 의존성 패키지 명세
+├── .env.example                      # 환경변수 설정 예시
+├── .gitignore                        # Git 추적 제외 파일 목록
+├── assets/
+│   └── pilot_tori.jpg                # 공식 마스코트 '파일럿 토리' 이미지
 ├── data/
-│   ├── travel_metadata.json          # [F2001] 글로벌 인기 여행지 100곳 메타데이터
-│   └── wiki_cache.json               # [NF2002] 위키백과 검색어·문서 수집 캐시
-├── src/
-│   ├── config.py                     # [NF2005] 경로, 모델, 청크 크기(1000/200), Top-k(3), MMR 설정
-│   ├── make_data.py                  # [F2001] 100곳 여행지 메타데이터 JSON 생성 스크립트
-│   ├── index_metadata.py             # [F2001~F2002] travel_meta 컬렉션 임베딩·색인 (ID: TRIP_{id})
-│   ├── collect_and_index_wiki.py     # [F2003~F2005] 프롬프트 1·2 위키 수집 및 travel_wiki 청킹·색인
-│   └── core_rag.py                   # [F2006~F2008, F2010~F2011] LangGraph(retrieve->generate) 및 특화 기능
-└── docs/
-    ├── 1_요구사항정의서.md            # [산출물 1] 필수·심화·비기능 요구사항 표 및 도메인 선정 근거
-    ├── 2_RAG_파이프라인_설계문서.md   # [산출물 2] 컬렉션 설계, 청킹(1000/200), 프롬프트 3종, Top-k 분석
-    ├── 3_검증결과_및_품질비교.md      # [산출물 3] 요구사항 대조표, 테스트 결과표, RAG 전후 비교(F2015)
-    └── 4_셀프체크리스트.md            # [산출물 5] 명세서 4장 기준 자체 점검 완료 체크리스트
+│   ├── travel_metadata.json          # 전 세계 100개 주요 여행지 메타데이터
+│   └── wiki_cache.json               # 위키백과 문서 수집 로컬 캐시
+├── docs/
+│   ├── images/                       # 시연 및 README용 스크린샷 에셋
+│   ├── 1_요구사항정의서.md            # 기능/비기능 요구사항 정의서
+│   ├── 2_RAG_파이프라인_설계문서.md   # 이중 컬렉션 RAG 및 청킹 설계서
+│   ├── 3_검증결과_및_품질비교.md      # RAG 전후 정량/정성 품질 비교
+│   └── 4_셀프체크리스트.md            # 요구사항 구현 점검표
+└── src/
+    ├── config.py                     # 모델, 경로, 프록시 호환 및 청킹 하이퍼파라미터
+    ├── make_data.py                  # 여행지 100선 메타데이터 생성 스크립트
+    ├── index_metadata.py             # travel_meta 컬렉션 색인 스크립트
+    ├── collect_and_index_wiki.py     # 위키백과 수집 및 travel_wiki 색인 스크립트
+    ├── core_rag.py                   # LangGraph 파이프라인 및 도메인 특화 핵심 로직
+    ├── background_inference.py       # 무중단 백그라운드 병렬 추론 엔진
+    ├── nature_visuals.py             # 자연 친화 힐링 뷰파인더 갤러리 모듈
+    ├── pdf_route_map.py              # 일자별 독립 동선 분할 지도 렌더러
+    └── publish_mobile_itinerary.py   # 모바일 QR 반응형 웹 일정표 생성 모듈
 ```
 
 ---
 
-## 3. 프로젝트 실행 방법
+## 🚀 빠른 시작 (Quick Start)
 
-### 1) 가상환경 생성 및 필수 라이브러리 설치
+### 1) 환경 준비 및 패키지 설치
 ```bash
+# Python 3.10 이상 권장
 python -m venv .venv
-# Windows PowerShell
+
+# Windows 환경
 .\.venv\Scripts\activate
+
+# 의존성 라이브러리 설치
 pip install -r requirements.txt
 ```
 
-### 2) 환경변수(`.env`) 설정
-`.env.example`을 참고하여 `.env` 파일에 SSAFY GMS API 키와 위키백과 연락처 이메일을 설정합니다.
+### 2) 환경변수 설정 (`.env`)
+프로젝트 루트 경로에 `.env` 파일을 생성하고 LLM API 키를 입력합니다.
 ```env
-GMS_KEY=your_gms_api_key_here
-OPENAI_BASE_URL=https://gms.ssafy.io/api/v1
-WIKI_CONTACT=ssafy_travel@example.com
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+WIKI_CONTACT=trippilot_contact@example.com
 ```
 
-### 3) 여행지 메타데이터 100건 생성 및 `travel_meta` 색인 (F2001 ~ F2002)
+### 3) 메타데이터 및 벡터 색인 구축
 ```bash
+# 1. 100대 여행지 메타데이터 생성 및 travel_meta 색인
 python src/make_data.py
 python src/index_metadata.py
-```
 
-### 4) (선택) 위키백과 수집·색인 및 LangGraph RAG 단독 검증 (F2003 ~ F2008)
-```bash
+# 2. 위키백과 데이터 수집 및 travel_wiki 색인 (선택)
 python src/collect_and_index_wiki.py
-python src/core_rag.py
 ```
 
-### 5) Streamlit 웹 서비스 실행 (F2009 ~ F2012)
+### 4) Streamlit 웹 애플리케이션 실행
 ```bash
 streamlit run app.py
 ```
+브라우저에서 `http://localhost:8501`로 접속하면 TripPilot 서비스를 바로 이용할 수 있습니다.
 
 ---
 
-## 4. 주요 기능 요약 (필수 및 심화 기능)
+## 📜 데이터 출처 및 라이선스 고지 (License & Attribution)
 
-- **메타데이터 색인 및 중복 방지 (`F2001`, `F2002`)**: 전 세계 여행지 100곳을 단일 검색 텍스트로 포맷팅하여 ChromaDB `travel_meta` 컬렉션에 `TRIP_{id}` 식별자로 적재합니다.
-- **프롬프트 기반 위키백과 수집 및 청킹 색인 (`F2003` ~ `F2005`, `NF2002`)**:
-  - **프롬프트 1**: 여행 큐레이터 역할로 질문에서 검색 키워드 3~5개 추출 (여행지명 첫 번째 필수 포함)
-  - **프롬프트 2**: 후보 문서 중 동음이의어를 배제하고 유효 문서만 선별해 본문과 원문 URL 수집 (여행지 본체 문서 최우선 포함)
-  - **청킹 및 색인**: `1,000자` 청크 / `200자` 중복으로 분할하여 `travel_wiki` 컬렉션에 `{trip_id}:{doc_title}:{chunk_index}` ID로 색인
-- **LangGraph 2-노드 RAG 파이프라인 (`F2006` ~ `F2008`)**:
-  - `retrieve` 노드: `travel_meta` 기본 청크(`[근거 1]`) + `travel_wiki` 검색 결과(`Top-k=3`) 병합 및 중복 제거
-  - `generate` 노드: 프롬프트 3을 통해 문서 근거만으로 답변을 생성하고 실제 인용된 `[근거 N]`만 파싱하여 하단 `st.expander`에 원문 링크와 함께 표시
-- **도메인 특화 기능 (`F2010`)**:
-  - **🗓️ 맞춤 2박 3일 여행 일정표 생성**: 위키백과 문서와 메타데이터를 근거로 1~3일차 시간대별(오전/오후/저녁) 여행 일정표를 마크다운 표(Table)로 생성하고 `[근거 N]`을 함께 제시
-  - **⚖️ 여행지 정보 팩트체크**: 여행 관련 주장의 사실 여부를 색인된 문서 근거로 판정
-- **조건 기반 자연어 여행지 탐색 (`F2011`)**: `"예산 100만원 이하 휴양지"` 등 자연어 조건 입력 시 `travel_meta` 검색 후 LLM이 조건 부합 여행지만 선별해 카드로 추천하고 원클릭으로 해당 여행지 대화로 연결
-- **심화 기능 (`F2014`, `F2015`, `F2016`)**:
-  - 유사도 검색(`similarity`)과 **MMR 다양성 검색(`mmr`)** 실시간 전환 및 비교
-  - 대표 질문 5종에 대한 **RAG 사용 전후 답변 품질 비교 문서화** (`docs/3_검증결과_및_품질비교.md`)
-  - 다중 출처(`여행지 메타데이터` vs `한국어 위키백과`) 결합 및 태그 구분 표시
+1. **한국어 위키백과 (Korean Wikipedia)**:
+   - 문서 출처: [ko.wikipedia.org](https://ko.wikipedia.org/) via MediaWiki Action API
+   - 라이선스: **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)** 및 GFDL
+   - 본 서비스는 모든 인용 정보에 대해 위키백과 원문 링크와 저작자 출처를 투명하게 제공합니다.
+2. **API User-Agent 준수**:
+   - 위키미디어 재단의 User-Agent 정책에 따라 요청 헤더에 연락처 정보를 명시하고 정중한 호출 간격(0.25s 및 지수 백오프)을 준수합니다.
 
 ---
 
-## 5. 데이터 출처 및 라이선스 이용 조건 안내 (NF2006, NF2007)
-
-1. **외부 문서 출처**: [한국어 위키백과 (Korean Wikipedia)](https://ko.wikipedia.org/) — MediaWiki Action API (`https://ko.wikipedia.org/w/api.php`)
-2. **라이선스 및 이용 조건 (CC BY-SA 4.0)**:
-   - 위키백과에서 수집한 모든 문서 텍스트는 **크리에이티브 커먼즈 저작자표시-동일조건변경허락 4.0 국제 라이선스 (CC BY-SA 4.0)** 및 GFDL에 따라 이용됩니다.
-   - 본 서비스는 라이선스 조건을 준수하여 답변 및 일정표에 인용된 모든 위키백과 문서의 **문서 제목과 원문 URL 하이퍼링크**를 화면 하단 인용 출처 영역(`st.expander`)에 명시합니다.
-3. **API 호출 예절 (User-Agent 정책 준수)**:
-   - Wikimedia Foundation의 User-Agent 정책에 따라 모든 API 요청 헤더에 연락처 정보(`User-Agent: TripPilotApp/1.0 ({WIKI_CONTACT}) python-requests`)를 포함하며, 호출 간격(`0.25s`) 및 `429 Too Many Requests` 지수 백오프 재시도 규칙을 준수합니다.
+<div align="center">
+  <b>TripPilot</b> — Safe, Empathetic, and Intelligent Journey
+</div>
