@@ -563,19 +563,19 @@ def render_nature_hero_html(trip_item: Dict[str, Any], visuals: Dict[str, Any], 
             </div>
             <div class="nature-hero-info-grid">
                 <div class="nature-info-item" style="background:rgba(8,26,18,0.84) !important; border:1.5px solid rgba(255,255,255,0.75) !important; border-radius:14px; padding:10px 14px; backdrop-filter:blur(10px); box-shadow:0 4px 14px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:3px;">
-                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#6EE7B7 !important; -webkit-text-fill-color:#6EE7B7 !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🗓️ 추천 시기</span>
+                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🗓️ 추천 시기</span>
                     <span class="nature-info-value" style="font-size:13.5px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; text-shadow:0 1px 4px rgba(0,0,0,0.9);">{best_season}</span>
                 </div>
                 <div class="nature-info-item" style="background:rgba(8,26,18,0.84) !important; border:1.5px solid rgba(255,255,255,0.75) !important; border-radius:14px; padding:10px 14px; backdrop-filter:blur(10px); box-shadow:0 4px 14px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:3px;">
-                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#6EE7B7 !important; -webkit-text-fill-color:#6EE7B7 !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">💰 예상 경비</span>
+                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">💰 예상 경비</span>
                     <span class="nature-info-value" style="font-size:13.5px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; text-shadow:0 1px 4px rgba(0,0,0,0.9);">{budget_level}</span>
                 </div>
                 <div class="nature-info-item" style="background:rgba(8,26,18,0.84) !important; border:1.5px solid rgba(255,255,255,0.75) !important; border-radius:14px; padding:10px 14px; backdrop-filter:blur(10px); box-shadow:0 4px 14px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:3px;">
-                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#6EE7B7 !important; -webkit-text-fill-color:#6EE7B7 !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🧭 핵심 테마</span>
+                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🧭 핵심 테마</span>
                     <span class="nature-info-value" style="font-size:13.5px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; text-shadow:0 1px 4px rgba(0,0,0,0.9);">{theme}</span>
                 </div>
                 <div class="nature-info-item" style="background:rgba(8,26,18,0.84) !important; border:1.5px solid rgba(255,255,255,0.75) !important; border-radius:14px; padding:10px 14px; backdrop-filter:blur(10px); box-shadow:0 4px 14px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:3px;">
-                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#6EE7B7 !important; -webkit-text-fill-color:#6EE7B7 !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🐣 파일럿 토리</span>
+                    <span class="nature-info-label" style="font-size:11px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; letter-spacing:0.02em; text-shadow:0 1px 3px rgba(0,0,0,0.8);">🐣 파일럿 토리</span>
                     <span class="nature-info-value" style="font-size:13.5px; font-weight:800; color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; text-shadow:0 1px 4px rgba(0,0,0,0.9);">자연 공감 AI 코파일럿 온로드</span>
                 </div>
             </div>
@@ -1033,12 +1033,13 @@ def render_welcome_hero_banner_html(
     """
     TripPilot 메인 상단 웰컴 히어로 배너:
     - 귀여운 파일럿 토리 조종사 3D 마스코트와 감성적인 여행 환영 인사
+    - 초록 배경 위 완벽한 가독성을 위한 고선명 순백색(#FFFFFF) 타이포그래피 적용
     - 어디로 -> 언제 -> 누구와 3단계 온보딩 플로우 안내
     - 실시간 여행지 탐색 현황 브리프 뱃지
     """
     tori_b64 = get_pilot_tori_b64()
     img_tag = (
-        f'<img src="data:image/jpeg;base64,{tori_b64}" class="welcome-tori-avatar" alt="Pilot Tori" style="width:78px; height:78px; border-radius:50%; object-fit:cover; border:3px solid #34D399; box-shadow:0 8px 24px rgba(6,78,59,0.35); flex-shrink:0;" />'
+        f'<img src="data:image/jpeg;base64,{tori_b64}" class="welcome-tori-avatar" alt="Pilot Tori" style="width:78px; height:78px; border-radius:50%; object-fit:cover; border:3px solid #FFFFFF; box-shadow:0 8px 24px rgba(0,0,0,0.45); flex-shrink:0;" />'
         if tori_b64
         else '<span style="font-size:48px;">🐣✈️</span>'
     )
@@ -1055,52 +1056,52 @@ def render_welcome_hero_banner_html(
 
     raw_html = f"""
     <div class="trippilot-welcome-card" style="
-        background: linear-gradient(135deg, #06281A 0%, #0D3E27 50%, #144E36 100%);
-        border: 1.5px solid rgba(52, 211, 153, 0.45);
+        background: linear-gradient(135deg, #052317 0%, #0A3622 50%, #10442F 100%);
+        border: 1.5px solid rgba(255, 255, 255, 0.45);
         border-radius: 24px;
         padding: clamp(18px, 2vw, 24px) clamp(20px, 2.4vw, 30px);
         margin-bottom: 20px;
-        box-shadow: 0 16px 36px -10px rgba(6, 40, 26, 0.28);
+        box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.35);
         position: relative;
         overflow: hidden;
     ">
-        <div style="position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(52, 211, 153, 0.20) 0%, transparent 70%); pointer-events: none;"></div>
-        <div style="position: absolute; left: 30%; bottom: -50px; width: 240px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+        <div style="position: absolute; right: -40px; top: -40px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%); pointer-events: none;"></div>
+        <div style="position: absolute; left: 30%; bottom: -50px; width: 260px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%); pointer-events: none;"></div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; position: relative; z-index: 2;">
             <div style="display: flex; align-items: center; gap: 18px; max-width: 820px;">
                 <div style="position: relative; flex-shrink: 0;">
                     {img_tag}
-                    <span style="position: absolute; bottom: -4px; right: -4px; background: #10B981; color: #FFFFFF; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; border: 1.5px solid #064E3B; letter-spacing: 0.04em;">CO-PILOT</span>
+                    <span style="position: absolute; bottom: -4px; right: -4px; background: #FFFFFF; color: #064E3B !important; -webkit-text-fill-color: #064E3B !important; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 999px; border: 1.5px solid #064E3B; letter-spacing: 0.04em;">CO-PILOT</span>
                 </div>
                 <div>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
-                        <span style="background: rgba(52, 211, 153, 0.22); border: 1px solid rgba(52, 211, 153, 0.6); color: #A7F3D0; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px;">🐣 AI 여행 코파일럿 토리</span>
-                        <span style="background: rgba(255, 255, 255, 0.12); color: #E2E8F0; font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;">🌍 100개 글로벌 인기 도시 실시간 RAG</span>
-                        <span style="background: rgba(16, 185, 129, 0.25); color: #6EE7B7; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;">⚡ 무중단 병렬 추론</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap;">
+                        <span style="background: rgba(255, 255, 255, 0.22); border: 1.5px solid rgba(255, 255, 255, 0.85); color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 11px; font-weight: 800; padding: 3px 11px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">🐣 AI 여행 코파일럿 토리</span>
+                        <span style="background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.70); color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">🌍 100개 글로벌 인기 도시 실시간 RAG</span>
+                        <span style="background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.70); color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">⚡ 무중단 병렬 추론</span>
                     </div>
-                    <h2 style="color: #FFFFFF; font-size: clamp(19px, 2.1vw, 25px); font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; text-shadow: 0 2px 6px rgba(0,0,0,0.5);">
+                    <h2 style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(20px, 2.2vw, 26px); font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; text-shadow: 0 2px 8px rgba(0,0,0,0.9);">
                         어디로 떠나고 싶으신가요? 나만의 감성 맞춤 여정 설계
                     </h2>
-                    <p style="color: #D1FAE5; font-size: clamp(12.5px, 1.0vw, 14px); margin: 0; line-height: 1.55; opacity: 0.95;">
-                        왼쪽 사이드바에서 <b>[1. 어디로 ➔ 2. 언제/얼마나 ➔ 3. 누구와/취향]</b> 3단계를 차례로 선택해 보세요.<br/>
+                    <p style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(13px, 1.05vw, 14.5px); margin: 0; line-height: 1.6; text-shadow: 0 1px 4px rgba(0,0,0,0.85); font-weight: 600;">
+                        왼쪽 사이드바에서 <b style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; text-decoration: underline; font-weight: 800;">[1. 어디로 ➔ 2. 언제/얼마나 ➔ 3. 누구와/취향]</b> 3단계를 차례로 선택해 보세요.<br/>
                         공공 위키백과 고증 정보와 최단 동선 지도로 세상에 하나뿐인 나만의 여행 일정을 완성해 드려요! 🌿
                     </p>
                 </div>
             </div>
 
-            <div style="background: rgba(6, 40, 26, 0.85); border: 1.5px solid rgba(52, 211, 153, 0.4); border-radius: 16px; padding: 12px 18px; backdrop-filter: blur(10px); min-width: 220px; box-shadow: 0 6px 18px rgba(0,0,0,0.25);">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px;">
-                    <span style="font-size: 10.5px; font-weight: 800; color: #6EE7B7; letter-spacing: 0.04em;">📍 현재 탐색 여정</span>
-                    <span style="background: #059669; color: #FFFFFF; font-size: 9.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;">{'진행 중' if wizard_step != 'completed' else '설정 완료'}</span>
+            <div style="background: rgba(4, 25, 16, 0.90); border: 1.5px solid rgba(255, 255, 255, 0.55); border-radius: 16px; padding: 14px 18px; backdrop-filter: blur(12px); min-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,0.40);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: 800; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; letter-spacing: 0.04em; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">📍 현재 탐색 여정</span>
+                    <span style="background: #10B981; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.7);">{'진행 중' if wizard_step != 'completed' else '설정 완료'}</span>
                 </div>
-                <div style="font-size: 14.5px; font-weight: 800; color: #FFFFFF; margin-bottom: 3px;">
+                <div style="font-size: 15.5px; font-weight: 800; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.9);">
                     {dest_str}
                 </div>
-                <div style="font-size: 11.5px; color: #A7F3D0; line-height: 1.4;">
+                <div style="font-size: 12px; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-weight: 600; line-height: 1.45; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
                     🗓️ {duration_label} · 👥 {comp_clean}
                 </div>
-                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(52, 211, 153, 0.25); font-size: 11px; color: #6EE7B7;">
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.35); font-size: 11.5px; font-weight: 700; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
                     👉 {cur_step_text}
                 </div>
             </div>
