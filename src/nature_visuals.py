@@ -1021,3 +1021,90 @@ def render_flying_tori_overlay_html(dest_name: str = "여행지") -> str:
         .replace("__QUOTES_JSON__", quotes_json)
         .replace("__SAFE_DEST__", safe_dest)
     )
+
+
+
+def render_welcome_hero_banner_html(
+    selected_trip: Dict[str, Any] | None = None,
+    wizard_step: int | str = 1,
+    duration_label: str = "2박 3일",
+    companion_choice: str = "친구들과 우정 여행",
+) -> str:
+    """
+    TripPilot 메인 상단 웰컴 히어로 배너:
+    - 귀여운 파일럿 토리 조종사 3D 마스코트와 감성적인 여행 환영 인사
+    - 어디로 -> 언제 -> 누구와 3단계 온보딩 플로우 안내
+    - 실시간 여행지 탐색 현황 브리프 뱃지
+    """
+    tori_b64 = get_pilot_tori_b64()
+    img_tag = (
+        f'<img src="data:image/jpeg;base64,{tori_b64}" class="welcome-tori-avatar" alt="Pilot Tori" style="width:78px; height:78px; border-radius:50%; object-fit:cover; border:3px solid #34D399; box-shadow:0 8px 24px rgba(6,78,59,0.35); flex-shrink:0;" />'
+        if tori_b64
+        else '<span style="font-size:48px;">🐣✈️</span>'
+    )
+
+    dest_str = f"[{selected_trip.get('country', '')}] {selected_trip.get('name', '')}" if selected_trip else "여행지 선택 중"
+    step_num = 3 if wizard_step == "completed" else int(wizard_step) if str(wizard_step).isdigit() else 1
+    step_labels = {
+        1: "1단계: 어디로 떠나실 건가요? (좌측 사이드바)",
+        2: "2단계: 언제, 얼마 동안 머무르실 예정인가요?",
+        3: "3단계: 누구와 어떤 스타일로 떠나시나요?",
+    }
+    cur_step_text = step_labels.get(step_num, "3단계 여정 설정 완료!")
+    comp_clean = companion_choice.split()[1] if len(companion_choice.split()) > 1 else companion_choice
+
+    raw_html = f"""
+    <div class="trippilot-welcome-card" style="
+        background: linear-gradient(135deg, #06281A 0%, #0D3E27 50%, #144E36 100%);
+        border: 1.5px solid rgba(52, 211, 153, 0.45);
+        border-radius: 24px;
+        padding: clamp(18px, 2vw, 24px) clamp(20px, 2.4vw, 30px);
+        margin-bottom: 20px;
+        box-shadow: 0 16px 36px -10px rgba(6, 40, 26, 0.28);
+        position: relative;
+        overflow: hidden;
+    ">
+        <div style="position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(52, 211, 153, 0.20) 0%, transparent 70%); pointer-events: none;"></div>
+        <div style="position: absolute; left: 30%; bottom: -50px; width: 240px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; position: relative; z-index: 2;">
+            <div style="display: flex; align-items: center; gap: 18px; max-width: 820px;">
+                <div style="position: relative; flex-shrink: 0;">
+                    {img_tag}
+                    <span style="position: absolute; bottom: -4px; right: -4px; background: #10B981; color: #FFFFFF; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; border: 1.5px solid #064E3B; letter-spacing: 0.04em;">CO-PILOT</span>
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                        <span style="background: rgba(52, 211, 153, 0.22); border: 1px solid rgba(52, 211, 153, 0.6); color: #A7F3D0; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px;">🐣 AI 여행 코파일럿 토리</span>
+                        <span style="background: rgba(255, 255, 255, 0.12); color: #E2E8F0; font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;">🌍 100개 글로벌 인기 도시 실시간 RAG</span>
+                        <span style="background: rgba(16, 185, 129, 0.25); color: #6EE7B7; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;">⚡ 무중단 병렬 추론</span>
+                    </div>
+                    <h2 style="color: #FFFFFF; font-size: clamp(19px, 2.1vw, 25px); font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; text-shadow: 0 2px 6px rgba(0,0,0,0.5);">
+                        어디로 떠나고 싶으신가요? 나만의 감성 맞춤 여정 설계
+                    </h2>
+                    <p style="color: #D1FAE5; font-size: clamp(12.5px, 1.0vw, 14px); margin: 0; line-height: 1.55; opacity: 0.95;">
+                        왼쪽 사이드바에서 <b>[1. 어디로 ➔ 2. 언제/얼마나 ➔ 3. 누구와/취향]</b> 3단계를 차례로 선택해 보세요.<br/>
+                        공공 위키백과 고증 정보와 최단 동선 지도로 세상에 하나뿐인 나만의 여행 일정을 완성해 드려요! 🌿
+                    </p>
+                </div>
+            </div>
+
+            <div style="background: rgba(6, 40, 26, 0.85); border: 1.5px solid rgba(52, 211, 153, 0.4); border-radius: 16px; padding: 12px 18px; backdrop-filter: blur(10px); min-width: 220px; box-shadow: 0 6px 18px rgba(0,0,0,0.25);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px;">
+                    <span style="font-size: 10.5px; font-weight: 800; color: #6EE7B7; letter-spacing: 0.04em;">📍 현재 탐색 여정</span>
+                    <span style="background: #059669; color: #FFFFFF; font-size: 9.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;">{'진행 중' if wizard_step != 'completed' else '설정 완료'}</span>
+                </div>
+                <div style="font-size: 14.5px; font-weight: 800; color: #FFFFFF; margin-bottom: 3px;">
+                    {dest_str}
+                </div>
+                <div style="font-size: 11.5px; color: #A7F3D0; line-height: 1.4;">
+                    🗓️ {duration_label} · 👥 {comp_clean}
+                </div>
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(52, 211, 153, 0.25); font-size: 11px; color: #6EE7B7;">
+                    👉 {cur_step_text}
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    return "\n".join(line.strip() for line in raw_html.splitlines() if line.strip())

@@ -71,6 +71,7 @@ from nature_visuals import (
     render_nature_gallery_html,
     render_pilot_tori_mascot_html,
     render_flying_tori_overlay_html,
+    render_welcome_hero_banner_html,
     get_pilot_tori_b64,
 )
 from publish_mobile_itinerary import publish_itinerary_to_mobile_web
@@ -539,12 +540,28 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
 
 
 
+@st.cache_data
 def load_travel_metadata() -> list[dict]:
     json_path = os.path.join(BASE_DIR, "data", "travel_metadata.json")
     if not os.path.exists(json_path):
         return []
     with open(json_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@st.cache_data
+def get_cached_wiki_cache() -> dict:
+    return load_wiki_cache()
+
+
+@st.cache_data
+def get_cached_destination_visuals(name: str, country: str, theme: str) -> dict:
+    return get_destination_visuals({"name": name, "country": country, "theme": theme})
+
+
+@st.cache_data
+def get_cached_currency_and_cost(country: str, budget_level: str) -> dict:
+    return get_currency_and_cost_info(country, budget_level)
 
 
 def build_welcome_message(trip_item: dict, vibe_mode: str = "nature") -> str:
@@ -1595,7 +1612,7 @@ if "itinerary_by_trip" not in st.session_state:
 if "chat_constraints_by_trip" not in st.session_state:
     st.session_state.chat_constraints_by_trip = {}
 if "vibe_override" not in st.session_state:
-    st.session_state.vibe_override = "auto"  # 'auto', 'nature', 'cyber'
+    st.session_state.vibe_override = "auto"
 if "packing_checklist" not in st.session_state:
     st.session_state.packing_checklist = [
         {"item": "여권 및 항공권 e-티켓 (유효기간 6개월 이상 확인)", "done": True},
@@ -1606,93 +1623,341 @@ if "packing_checklist" not in st.session_state:
         {"item": "우산 / 우비 및 일교차 대비 가벼운 겉옷", "done": False},
     ]
 
-# 0. 백그라운드 병렬 추론 완료 태스크 자동 감지 및 세션 동기화 (화면 이동 중에도 완주 보장)
+# ── [단계별 대화형 플래너 위자드 세션 상태] ──
+if "wizard_step" not in st.session_state:
+    st.session_state.wizard_step = 1  # 1: 어디로, 2: 언제/얼마나, 3: 누구와/취향, 'completed': 완료 요약
+if "travel_month_num" not in st.session_state:
+    st.session_state.travel_month_num = 11
+if "duration_preset" not in st.session_state:
+    st.session_state.duration_preset = "2박 3일 (인기 추천)"
+if "target_days" not in st.session_state:
+    st.session_state.target_days = 3
+if "companion_choice" not in st.session_state:
+    st.session_state.companion_choice = "👫 친구들과 우정 여행"
+if "style_choices" not in st.session_state:
+    st.session_state.style_choices = ["☕ 감성 카페 & 힐링", "🍣 현지 미식 & 로컬 맛집"]
+if "pace_choice" not in st.session_state:
+    st.session_state.pace_choice = "😌 여유롭게 (힐링)"
+if "dietary_choices" not in st.session_state:
+    st.session_state.dietary_choices = ["✅ 해당 없음 (알러지 없음)"]
+
+# 0. 백그라운드 병렬 추론 완료 태스크 자동 감지 및 세션 동기화
 sync_completed_background_tasks(st.session_state)
 
 
 def select_destination_callback(target_trip_id: str):
-    """조건 탐색 카드에서 여행지 선택 시 사이드바 필터와 선택 상태를 즉시 동기화"""
+    """조건 탐색 카드에서 여행지 선택 시 사이드바 필터와 선택 상태를 즉시 동기화하고 2단계(언제)로 안내"""
     st.session_state.selected_trip_id = str(target_trip_id)
     st.session_state.continent_filter = "전체 대륙"
+    st.session_state.wizard_step = 2
 
 
-# 4. 사이드바 구성
+# 4. 사이드바 구성 (단계별 대화형 플래너 위자드)
 with st.sidebar:
     st.markdown("## 🐣 TripPilot")
-    st.caption("AI 여행 메이트 토리 & 맞춤 일정 플래너")
+    st.caption("AI 여행 코파일럿 토리와 함께하는 감성 여행")
     st.markdown(render_pilot_tori_mascot_html(), unsafe_allow_html=True)
 
+    wizard_step = st.session_state.get("wizard_step", 1)
+
+    # 상단 3-Step 탭 네비게이터 (언제든 클릭하여 단계 전환 가능)
+    st.markdown(
+        """<div style="font-size:11px; font-weight:800; color:#059669; margin-bottom:4px; letter-spacing:0.04em;">🧭 단계별 맞춤 여행 플래너</div>""",
+        unsafe_allow_html=True,
+    )
+    w_nav1, w_nav2, w_nav3 = st.columns(3)
+    with w_nav1:
+        s1_type = "primary" if wizard_step == 1 else "secondary"
+        if st.button("📍 1.어디로", key="w_nav_1", use_container_width=True, type=s1_type):
+            st.session_state.wizard_step = 1
+            st.rerun()
+    with w_nav2:
+        s2_type = "primary" if wizard_step == 2 else "secondary"
+        if st.button("🗓️ 2.언제", key="w_nav_2", use_container_width=True, type=s2_type):
+            st.session_state.wizard_step = 2
+            st.rerun()
+    with w_nav3:
+        s3_type = "primary" if wizard_step in (3, "completed") else "secondary"
+        if st.button("✨ 3.취향", key="w_nav_3", use_container_width=True, type=s3_type):
+            st.session_state.wizard_step = 3
+            st.rerun()
+
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+
     continents = ["전체 대륙"] + sorted(list({item["continent"] for item in travel_list}))
-    selected_continent = st.selectbox("🌍 대륙 선택", continents, key="continent_filter")
-
     filtered_trips = travel_list
-    if selected_continent != "전체 대륙":
-        filtered_trips = [item for item in filtered_trips if item["continent"] == selected_continent]
-
+    sel_cont = st.session_state.get("continent_filter", "전체 대륙")
+    if sel_cont != "전체 대륙":
+        filtered_trips = [item for item in filtered_trips if item["continent"] == sel_cont]
     if not filtered_trips:
-        st.info("해당 대륙의 여행지가 없어 전체 목록을 표시합니다.")
         filtered_trips = travel_list
-
     trip_id_to_item = {str(item["id"]): item for item in filtered_trips}
+
     if st.session_state.selected_trip_id not in trip_id_to_item:
         st.session_state.selected_trip_id = str(filtered_trips[0]["id"])
 
-    id_options = list(trip_id_to_item.keys())
-    current_idx = id_options.index(st.session_state.selected_trip_id)
+    # ── [STEP 1: 어디로 떠나실 건가요?] ──
+    if wizard_step == 1:
+        st.markdown("""
+<div style="background:#F0FDF4; border:1.5px solid #10B981; border-radius:14px; padding:10px 13px; margin-bottom:12px;">
+    <div style="font-size:10.5px; font-weight:800; color:#059669;">STEP 1 / 3</div>
+    <div style="font-size:14px; font-weight:800; color:#064E3B; margin-bottom:3px;">📍 어디로 떠나고 싶으신가요?</div>
+    <div style="font-size:11.5px; color:#047857; line-height:1.45;">원하시는 대륙과 도시를 고르면 실시간 위키 정보와 자연 뷰파인더가 준비됩니다.</div>
+</div>
+""", unsafe_allow_html=True)
 
-    chosen_id = st.selectbox(
-        "📍 여행할 도시 · 랜드마크",
-        options=id_options,
-        index=current_idx,
-        format_func=lambda tid: f"[{trip_id_to_item[tid]['country']}] {trip_id_to_item[tid]['name']} ({trip_id_to_item[tid]['theme']})",
-    )
-    st.session_state.selected_trip_id = chosen_id
-    selected_trip = trip_id_to_item[chosen_id]
-    trip_id = str(selected_trip["id"])
+        selected_continent = st.selectbox("🌍 대륙 선택", continents, key="continent_filter")
+
+        id_options = list(trip_id_to_item.keys())
+        current_idx = id_options.index(st.session_state.selected_trip_id) if st.session_state.selected_trip_id in id_options else 0
+
+        chosen_id = st.selectbox(
+            "📍 여행할 도시 · 랜드마크",
+            options=id_options,
+            index=current_idx,
+            format_func=lambda tid: f"[{trip_id_to_item[tid]['country']}] {trip_id_to_item[tid]['name']} ({trip_id_to_item[tid]['theme']})",
+            key="sb_city_select",
+        )
+        st.session_state.selected_trip_id = chosen_id
+        selected_trip = trip_id_to_item[chosen_id]
+
+        selected_visuals = get_cached_destination_visuals(
+            selected_trip["name"], selected_trip["country"], selected_trip.get("theme", "")
+        )
+        with st.container(border=True):
+            preview_rendered = """
+<div style="border-radius:10px; overflow:hidden; margin-bottom:8px; position:relative;">
+    <img src="{thumb_url}" style="width:100%; height:95px; object-fit:cover; display:block;" />
+    <span style="position:absolute; bottom:5px; right:6px; background:rgba(6,78,59,0.92); color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;">🌿 자연 {nature_score}%</span>
+</div>
+<div style="font-size:13.5px; font-weight:800; color:#064E3B; margin-bottom:2px;">[{country}] {dest_name}</div>
+<div style="font-size:11.5px; color:#375346; line-height:1.5;">
+    • <b>테마</b>: {theme}<br/>
+    • <b>추천 시기</b>: {best_season}<br/>
+    • <b>예상 예산</b>: {budget_level}
+</div>
+""".format(
+                thumb_url=selected_visuals['thumb_url'],
+                nature_score=selected_visuals['nature_score'],
+                country=selected_trip['country'],
+                dest_name=selected_trip['name'],
+                theme=selected_trip['theme'],
+                best_season=selected_trip['best_season'],
+                budget_level=selected_trip['budget_level']
+            )
+            st.markdown(preview_rendered, unsafe_allow_html=True)
+
+        if st.button("다음: 언제 떠나시나요? ➔", type="primary", use_container_width=True, key="w1_btn_next"):
+            st.session_state.wizard_step = 2
+            st.rerun()
+
+    # ── [STEP 2: 언제, 얼마 동안 머무르실 예정인가요?] ──
+    elif wizard_step == 2:
+        trip_id = st.session_state.selected_trip_id
+        selected_trip = next((t for t in travel_list if str(t["id"]) == trip_id), travel_list[0])
+
+        st.markdown("""
+<div style="background:#F0FDF4; border:1.5px solid #10B981; border-radius:14px; padding:10px 13px; margin-bottom:12px;">
+    <div style="font-size:10.5px; font-weight:800; color:#059669;">STEP 2 / 3</div>
+    <div style="font-size:14px; font-weight:800; color:#064E3B; margin-bottom:3px;">🗓️ 언제, 얼마 동안 머무르실 예정인가요?</div>
+    <div style="font-size:11.5px; color:#047857; line-height:1.45;">선택하신 여행지의 최적 날씨와 일정 길이를 고려합니다.</div>
+</div>
+""", unsafe_allow_html=True)
+        st.info(f"💡 **{selected_trip['name']}** 추천 여행 시기: **{selected_trip['best_season']}**")
+
+        travel_month_num = st.selectbox(
+            "📅 출발 예정 월",
+            options=list(range(1, 13)),
+            index=st.session_state.get("travel_month_num", 11) - 1,
+            format_func=lambda m: f"{m}월",
+            key="w2_month_select",
+        )
+        st.session_state.travel_month_num = travel_month_num
+
+        dur_presets = [
+            "2박 3일 (인기 추천)",
+            "당일치기 (1일)",
+            "1박 2일",
+            "3박 4일",
+            "4박 5일",
+            "5박 6일",
+            "6박 7일 (1주일)",
+            "9박 10일 (열흘 코스)",
+            "13박 14일 (2주 살기)",
+            "20박 21일 (3주 살기)",
+            "29박 30일 (한달살기)",
+            "⚙️ 일수 직접 입력 (1~30일)",
+        ]
+        cur_preset = st.session_state.get("duration_preset", "2박 3일 (인기 추천)")
+        p_idx = dur_presets.index(cur_preset) if cur_preset in dur_presets else 0
+
+        duration_preset = st.selectbox("⏱️ 여행 기간 선택 (최대 30일)", dur_presets, index=p_idx, key="w2_dur_select")
+        st.session_state.duration_preset = duration_preset
+
+        if duration_preset == "⚙️ 일수 직접 입력 (1~30일)":
+            target_days = st.slider("여행 일수 선택 (최대 30일)", min_value=1, max_value=30, value=st.session_state.get("target_days", 3), format="%d일", key="w2_dur_slider")
+            st.session_state.target_days = target_days
+        else:
+            dur_preset_map = {
+                "당일치기 (1일)": 1,
+                "1박 2일": 2,
+                "2박 3일 (인기 추천)": 3,
+                "3박 4일": 4,
+                "4박 5일": 5,
+                "5박 6일": 6,
+                "6박 7일 (1주일)": 7,
+                "9박 10일 (열흘 코스)": 10,
+                "13박 14일 (2주 살기)": 14,
+                "20박 21일 (3주 살기)": 21,
+                "29박 30일 (한달살기)": 30,
+            }
+            target_days = dur_preset_map.get(duration_preset, 3)
+            st.session_state.target_days = target_days
+
+        w2_col1, w2_col2 = st.columns(2)
+        with w2_col1:
+            if st.button("◀ 이전: 여행지", use_container_width=True, key="w2_btn_back"):
+                st.session_state.wizard_step = 1
+                st.rerun()
+        with w2_col2:
+            if st.button("다음: 취향 선택 ➔", type="primary", use_container_width=True, key="w2_btn_fwd"):
+                st.session_state.wizard_step = 3
+                st.rerun()
+
+    # ── [STEP 3: 누구와 어떤 스타일로 떠나시나요?] ──
+    elif wizard_step == 3:
+        trip_id = st.session_state.selected_trip_id
+        selected_trip = next((t for t in travel_list if str(t["id"]) == trip_id), travel_list[0])
+
+        st.markdown("""
+<div style="background:#F0FDF4; border:1.5px solid #10B981; border-radius:14px; padding:10px 13px; margin-bottom:12px;">
+    <div style="font-size:10.5px; font-weight:800; color:#059669;">STEP 3 / 3</div>
+    <div style="font-size:14px; font-weight:800; color:#064E3B; margin-bottom:3px;">✨ 누구와 어떤 스타일로 떠나시나요?</div>
+    <div style="font-size:11.5px; color:#047857; line-height:1.45;">동행자와 여행 취향, 알러지 케어를 반영해 최적의 동선과 맛집을 조율합니다.</div>
+</div>
+""", unsafe_allow_html=True)
+
+        comp_options = ["👫 친구들과 우정 여행", "💑 연인과 로맨틱 여행", "👨‍👩‍👧 가족/부모님과 편한 여행", "🎒 혼자 떠나는 자유 여행"]
+        cur_comp = st.session_state.get("companion_choice", comp_options[0])
+        c_idx = comp_options.index(cur_comp) if cur_comp in comp_options else 0
+        companion_choice = st.selectbox("👥 누구와 함께 가나요?", comp_options, index=c_idx, key="w3_comp_select")
+        st.session_state.companion_choice = companion_choice
+
+        style_options = [
+            "☕ 감성 카페 & 힐링",
+            "🍣 현지 미식 & 로컬 맛집",
+            "🏛️ 문화 예술 & 역사 유적",
+            "📸 인생샷 포토존",
+            "🌿 자연 & 산책 힐링",
+            "🛍️ 쇼핑 & 소품샵",
+            "🌃 야경 & 루프탑",
+            "🎢 액티비티 & 체험",
+        ]
+        cur_styles = st.session_state.get("style_choices", ["☕ 감성 카페 & 힐링", "🍣 현지 미식 & 로컬 맛집"])
+        style_choices = st.multiselect("✨ 선호하는 여행 취향", style_options, default=cur_styles, key="w3_style_select")
+        st.session_state.style_choices = style_choices
+
+        pace_options = ["😌 여유롭게 (힐링)", "👟 알차게 (핵심 정복)", "😴 늦잠 모드 (11시)"]
+        cur_pace = st.session_state.get("pace_choice", pace_options[0])
+        pace_idx = pace_options.index(cur_pace) if cur_pace in pace_options else 0
+        pace_choice = st.selectbox("⏰ 일정 템포", pace_options, index=pace_idx, key="w3_pace_select")
+        st.session_state.pace_choice = pace_choice
+
+        dietary_options = [
+            "✅ 해당 없음 (알러지 없음)",
+            "🚫 생선·해산물 알러지 (육류 대체)",
+            "🚫 갑각류(새우·게) 알러지",
+            "🥜 견과류·땅콩 알러지",
+            "🥗 비건·채식 위주 식단",
+            "🥩 돼지고기 제외 (할랄)",
+            "♿ 계단 최소화·택시 이동",
+        ]
+        cur_diet = st.session_state.get("dietary_choices", ["✅ 해당 없음 (알러지 없음)"])
+        dietary_choices = st.multiselect("🛡️ 알러지·식이제한 케어", dietary_options, default=cur_diet, key="w3_diet_select")
+        st.session_state.dietary_choices = dietary_choices
+
+        w3_col1, w3_col2 = st.columns(2)
+        with w3_col1:
+            if st.button("◀ 이전: 일정", use_container_width=True, key="w3_btn_back"):
+                st.session_state.wizard_step = 2
+                st.rerun()
+        with w3_col2:
+            if st.button("🎉 설정 완료 & 일정 보기", type="primary", use_container_width=True, key="w3_btn_done"):
+                st.session_state.wizard_step = "completed"
+                st.rerun()
+
+    # ── [설정 완료 모드: 나만의 여정 브리프 요약 카드] ──
+    else:
+        trip_id = st.session_state.selected_trip_id
+        selected_trip = next((t for t in travel_list if str(t["id"]) == trip_id), travel_list[0])
+        travel_month_num = st.session_state.get("travel_month_num", 11)
+        target_days = st.session_state.get("target_days", 3)
+        duration_label = "2박 3일" if target_days == 3 else ("당일치기" if target_days == 1 else f"{target_days-1}박 {target_days}일")
+        companion_choice = st.session_state.get("companion_choice", "친구들과 우정 여행")
+        style_choices = st.session_state.get("style_choices", ["감성 카페", "현지 미식"])
+        pace_choice = st.session_state.get("pace_choice", "여유롭게")
+        dietary_choices = st.session_state.get("dietary_choices", ["해당 없음"])
+
+        summary_rendered = """
+<div style="background:#FAF8F5; border:1.5px solid #10B981; border-radius:16px; padding:13px 14px; margin-bottom:12px; box-shadow:0 4px 14px rgba(6,78,59,0.06);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:11px; font-weight:800; color:#059669;">✨ 나만의 맞춤 여정 브리프</span>
+        <span style="background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;">설정 완료</span>
+    </div>
+    <div style="font-size:15px; font-weight:800; color:#064E3B; margin-bottom:5px;">
+        [{country}] {dest_name}
+    </div>
+    <div style="font-size:11.8px; color:#375346; line-height:1.55;">
+        • <b>일정</b>: {month}월 출발 · {dur_label}<br/>
+        • <b>동행</b>: {comp_txt}<br/>
+        • <b>취향</b>: {style_txt}<br/>
+        • <b>템포/식이</b>: {pace_txt} · {diet_txt}
+    </div>
+</div>
+""".format(
+            country=selected_trip['country'],
+            dest_name=selected_trip['name'],
+            month=travel_month_num,
+            dur_label=duration_label,
+            comp_txt=companion_choice.split()[1] if len(companion_choice.split())>1 else companion_choice,
+            style_txt=', '.join(style_choices[:2]),
+            pace_txt=pace_choice.split()[0],
+            diet_txt=dietary_choices[0].split()[0]
+        )
+        st.markdown(summary_rendered, unsafe_allow_html=True)
+
+        sc_col1, sc_col2 = st.columns(2)
+        with sc_col1:
+            if st.button("✏️ 조건 수정", use_container_width=True, key="sb_btn_edit"):
+                st.session_state.wizard_step = 1
+                st.rerun()
+        with sc_col2:
+            if st.button("🔄 다른 여행지", use_container_width=True, key="sb_btn_change"):
+                st.session_state.wizard_step = 1
+                st.rerun()
+
+    # 사이드바 하단 공통 예약 칩 및 보조 도구
+    trip_id = str(st.session_state.selected_trip_id)
+    selected_trip = next((t for t in travel_list if str(t["id"]) == trip_id), travel_list[0])
     dest_name = selected_trip["name"]
+    sidebar_links = make_booking_links(dest_name, selected_trip["country"])
+    st.markdown(
+        f'<div style="margin-top:10px; margin-bottom:8px;">'
+        f'<a class="booking-chip" href="{sidebar_links["google_maps"]}" target="_blank">📍 구글 지도</a>'
+        f'<a class="booking-chip" href="{sidebar_links["agoda"]}" target="_blank">🏨 숙소 검색</a>'
+        f'<a class="booking-chip" href="{sidebar_links["skyscanner"]}" target="_blank">✈️ 항공권</a>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    active_vibe = "nature"
-
-    wiki_cache = load_wiki_cache()
+    wiki_cache = get_cached_wiki_cache()
     trip_cached_info = wiki_cache.get(trip_id, {})
     cached_titles = trip_cached_info.get("titles", [])
-    sidebar_links = make_booking_links(dest_name, selected_trip["country"])
-
-    selected_visuals = get_destination_visuals(selected_trip)
-    st.markdown("#### 🗺️ 선택 여행지 요약")
-    with st.container(border=True):
-        st.markdown(
-            f'''
-            <div style="border-radius: 14px; overflow: hidden; margin-bottom: 12px; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,0.12);">
-                <img src="{selected_visuals['thumb_url']}" style="width: 100%; height: 110px; object-fit: cover; display: block;" />
-                <span style="position: absolute; bottom: 6px; right: 8px; background: rgba(6,78,59,0.9); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; backdrop-filter: blur(4px);">🌿 자연 친화도 {selected_visuals['nature_score']}%</span>
-            </div>
-            ''',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'''
-**{selected_trip['name']}** (`{selected_trip['country']}` · {selected_trip['continent']})
-- **테마**: `{selected_trip['theme']}`
-- **자연 쉼터**: `{selected_visuals['nature_level']}`
-- **예산**: `{selected_trip['budget_level']}`
-- **추천 시기**: `{selected_trip['best_season']}`
-- **소개**: {selected_trip['summary']}
-            '''
-        )
-        st.markdown(
-            f'<a class="booking-chip" href="{sidebar_links["google_maps"]}" target="_blank">📍 구글 지도</a>'
-            f'<a class="booking-chip" href="{sidebar_links["agoda"]}" target="_blank">🏨 숙소 검색</a>'
-            f'<a class="booking-chip" href="{sidebar_links["skyscanner"]}" target="_blank">✈️ 항공권</a>',
-            unsafe_allow_html=True,
-        )
 
     st.caption(
         f"여행지 메타데이터 색인: {meta_count}건 | "
         f"수집된 위키 문서: {len(cached_titles)}건 (전체 {wiki_count}청크)"
     )
-    if cached_titles:
-        st.caption(" · ".join(cached_titles))
 
     with st.expander("⚙️ 검색 및 문서 분할 설정", expanded=False):
         search_type_label = st.radio(
@@ -1700,15 +1965,16 @@ with st.sidebar:
             options=["similarity", "mmr"],
             format_func=lambda x: "유사도 중심 검색 (Similarity)" if x == "similarity" else "다양성 고려 검색 (MMR)",
             index=0,
+            key="cfg_search_type",
         )
-        top_k_val = st.slider("참조 문서 검색 수 (Top-k)", min_value=1, max_value=8, value=WIKI_TOP_K)
-        chunk_size_val = st.select_slider("문서 청크 크기", options=[500, 800, 1000, 1500], value=CHUNK_SIZE)
-        chunk_overlap_val = st.select_slider("청크 중복 길이", options=[50, 100, 200, 300], value=CHUNK_OVERLAP)
-        force_recollect = st.checkbox("위키백과 문서 새로 수집하기", value=False)
+        top_k_val = st.slider("참조 문서 검색 수 (Top-k)", min_value=1, max_value=8, value=WIKI_TOP_K, key="cfg_top_k")
+        chunk_size_val = st.select_slider("문서 청크 크기", options=[500, 800, 1000, 1500], value=CHUNK_SIZE, key="cfg_chunk_size")
+        chunk_overlap_val = st.select_slider("청크 중복 길이", options=[50, 100, 200, 300], value=CHUNK_OVERLAP, key="cfg_chunk_overlap")
+        force_recollect = st.checkbox("위키백과 문서 새로 수집하기", value=False, key="cfg_recollect")
 
-    if st.button("🗑️ 현재 여행지 대화 초기화", use_container_width=True):
+    if st.button("🗑️ 현재 여행지 대화 초기화", use_container_width=True, key="btn_reset_chat"):
         st.session_state.messages_by_trip[trip_id] = [
-            {"role": "assistant", "content": build_welcome_message(selected_trip, active_vibe), "cited_sources": []}
+            {"role": "assistant", "content": build_welcome_message(selected_trip, "nature"), "cited_sources": []}
         ]
         st.rerun()
 
@@ -1716,61 +1982,60 @@ with st.sidebar:
     st.warning(DISCLAIMER_TEXT)
     st.caption("문서 출처: 한국어 위키백과 (CC BY-SA 4.0)")
 
+# ── [전역 활성 여정 파라미터 도출] ──
+active_vibe = "nature"
+target_days = st.session_state.get("target_days", 3)
+travel_month_num = st.session_state.get("travel_month_num", 11)
+companion_choice = st.session_state.get("companion_choice", "👫 친구들과 우정 여행")
+style_choices = st.session_state.get("style_choices", ["☕ 감성 카페 & 힐링", "🍣 현지 미식 & 로컬 맛집"])
+pace_choice = st.session_state.get("pace_choice", "😌 여유롭게 (힐링)")
+dietary_choices = st.session_state.get("dietary_choices", ["✅ 해당 없음 (알러지 없음)"])
+
+if target_days == 1:
+    duration_label = "당일치기"
+elif target_days == 30:
+    duration_label = "29박 30일 (한달살기)"
+elif target_days == 7:
+    duration_label = "6박 7일 (1주일)"
+elif target_days == 14:
+    duration_label = "13박 14일 (2주 살기)"
+elif target_days == 21:
+    duration_label = "20박 21일 (3주 살기)"
+else:
+    duration_label = f"{target_days-1}박 {target_days}일"
+
+chat_constraints_list = st.session_state.chat_constraints_by_trip.get(trip_id, [])
+active_dietary = [c for c in dietary_choices if "해당 없음" not in c and "알러지 없음" not in c]
+all_constraints = list(active_dietary) + [c for c in chat_constraints_list if c not in active_dietary and "해당 없음" not in c and "알러지 없음" not in c]
+constraint_str = f", 필수 배려·식이제한: {', '.join(all_constraints)}" if all_constraints else ""
+user_pref_summary = (
+    f"{companion_choice}, 기간: {duration_label} (총 {target_days}일), "
+    f"선호 테마: {', '.join(style_choices) or '힐링/미식'}, "
+    f"템포: {pace_choice}, 출발 예정: {travel_month_num}월{constraint_str}"
+)
+
+selected_visuals = get_cached_destination_visuals(
+    selected_trip["name"], selected_trip["country"], selected_trip.get("theme", "")
+)
+
 # 선택된 무드(밝은 오트밀 & 포레스트 그린) CSS 및 배경 애니메이션 주입
 inject_theme_css_and_background(active_vibe, dest_name)
 
 # 🐥 하늘을 날아다니는 3D 파일럿 토리 오버레이 (클릭 시 하단 여행 라운지로 스크롤 이동)
 st.markdown(render_flying_tori_overlay_html(dest_name), unsafe_allow_html=True)
 
-# 💡 첫 방문자를 위한 4-Step 비주얼 튜토리얼 가이드 (초보자 안내)
-with st.expander("🐣 **처음 오셨나요? 4단계로 끝내는 TripPilot 100% 활용 튜토리얼 (클릭하여 열기)**", expanded=True):
-    st.markdown(
-        """
-        <div style="background: #FFFFFF; border: 1.5px solid #10B981; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(6,78,59,0.06); margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #ECFDF5; padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <span style="font-size: 15.5px; font-weight: 800; color: #064E3B;">🧭 TripPilot AI 맞춤 여행 플래너 4단계 마스터 가이드</span>
-                <span style="background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px;">🐣 1분 만에 완성하기</span>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
-                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
-                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 1</div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">📍 여행지 선택하기</div>
-                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
-                        <b>왼쪽 사이드바</b>에서 <code>대륙</code>과 <code>도시·랜드마크</code>를 선택하세요.<br/>
-                        <span style="font-size: 11px; color: #059669;">💡 2번째 탭 <b>'맞춤 조건 추천'</b>에서 '온천 휴양지'처럼 조건으로 찾을 수도 있어요!</span>
-                    </div>
-                </div>
-                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
-                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 2</div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">✨ 취향 & 알러지 체크</div>
-                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
-                        상단 옵션 바에서 <b>동행자, 여행 취향, 템포, 알러지</b>를 선택하세요.<br/>
-                        <span style="font-size: 11px; color: #059669;">💡 알러지가 없다면 기본값 <b>'해당 없음'</b>을 선택하시면 됩니다.</span>
-                    </div>
-                </div>
-                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
-                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 3</div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">🚀 원클릭 맞춤 일정 생성</div>
-                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
-                        우측의 <b>'내 취향 반영 2박 3일 맞춤 일정표 생성'</b> 초록색 버튼을 클릭하세요.<br/>
-                        <span style="font-size: 11px; color: #059669;">💡 AI 토리가 위키 기반 고증 명소와 최단 동선 지도를 완성합니다!</span>
-                    </div>
-                </div>
-                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
-                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 4</div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">💬 실시간 조율 & 공유</div>
-                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
-                        하단 <b>파일럿 토리 라운지</b>에서 <i>'비 올 때 실내 코스로 바꿔줘'</i>라고 말하면 일정이 즉시 바뀝니다!<br/>
-                        <span style="font-size: 11px; color: #059669;">💡 <b>PDF 저장</b> 또는 <b>스마트폰 QR 코드</b>로 친구들에게 바로 공유하세요.</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# 🌟 1. TripPilot 메인 웰컴 히어로 배너 (첫 접속자 환영 및 3단계 온보딩 안내)
+st.markdown(
+    render_welcome_hero_banner_html(
+        selected_trip=selected_trip,
+        wizard_step=st.session_state.get("wizard_step", 1),
+        duration_label=duration_label,
+        companion_choice=companion_choice,
+    ),
+    unsafe_allow_html=True,
+)
 
-# 5. 현실감 넘치는 고해상도 실사 자연 히어로 배너 & 갤러리
+# 📸 2. 현실감 넘치는 고해상도 실사 자연 히어로 배너 & 갤러리
 vibe_badge_text = "🌿 WARM OATMEAL & BIOPHILIC FOREST · 자연과 쉼이 어우러진 감성 여행 가이드"
 
 st.markdown(
@@ -1794,123 +2059,57 @@ tab_main, tab_explore, tab_compare, tab_friends, tab_factcheck = st.tabs([
 
 # ── 탭 1: 좌측(토리와 취향 채팅) + 우측(맞춤 일정·동선 지도 대시보드) ──
 with tab_main:
-    # 취향 & 알러지 & 출발 월 선택 바
+    # ── [깔끔한 선택 여정 브리프 & 원클릭 생성 콘솔 바] ──
     with st.container(border=True):
-        p_row1_c1, p_row1_c2, p_row1_c3 = st.columns([1.1, 1.4, 0.85], gap="medium")
-        with p_row1_c1:
-            companion_choice = st.selectbox(
-                "👥 누구와 함께 가나요?",
-                ["👫 친구들과 우정 여행", "💑 연인과 로맨틱 여행", "👨‍👩‍👧 가족/부모님과 편한 여행", "🎒 혼자 떠나는 자유 여행"],
-                key=f"comp_{trip_id}",
-            )
-        with p_row1_c2:
-            duration_preset = st.selectbox(
-                "🗓️ 여행 기간 설정 (최대 한달살기)",
-                [
-                    "2박 3일 (인기 추천)",
-                    "당일치기 (1일)",
-                    "1박 2일",
-                    "3박 4일",
-                    "4박 5일",
-                    "5박 6일",
-                    "6박 7일 (1주일)",
-                    "9박 10일 (열흘 코스)",
-                    "13박 14일 (2주 살기)",
-                    "20박 21일 (3주 살기)",
-                    "29박 30일 (한달살기)",
-                    "⚙️ 일수 직접 입력 (1~30일)",
-                ],
-                index=0,
-                key=f"dur_preset_{trip_id}",
-            )
-            if duration_preset == "⚙️ 일수 직접 입력 (1~30일)":
-                target_days = st.slider("여행 일수 선택 (최대 30일)", min_value=1, max_value=30, value=3, format="%d일", key=f"dur_slider_{trip_id}")
-            else:
-                dur_preset_map = {
-                    "당일치기 (1일)": 1,
-                    "1박 2일": 2,
-                    "2박 3일 (인기 추천)": 3,
-                    "3박 4일": 4,
-                    "4박 5일": 5,
-                    "5박 6일": 6,
-                    "6박 7일 (1주일)": 7,
-                    "9박 10일 (열흘 코스)": 10,
-                    "13박 14일 (2주 살기)": 14,
-                    "20박 21일 (3주 살기)": 21,
-                    "29박 30일 (한달살기)": 30,
-                }
-                target_days = dur_preset_map.get(duration_preset, 3)
+        br_c1, br_c2 = st.columns([2.4, 1.3], gap="medium")
+        with br_c1:
+            comp_short = companion_choice.split()[1] if len(companion_choice.split()) > 1 else companion_choice
+            styles_short = ", ".join(style_choices[:3]) if style_choices else "자유 힐링"
+            diet_short = dietary_choices[0].split()[0] if dietary_choices else "해당 없음"
+            pace_short = pace_choice.split()[0] if pace_choice else "여유롭게"
 
-        with p_row1_c3:
-            travel_month_num = st.selectbox(
-                "📅 출발 예정 월",
-                options=list(range(1, 13)),
-                index=10,
-                format_func=lambda m: f"{m}월",
-                key=f"month_sel_{trip_id}",
+            st.markdown(
+                f"""
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="font-size:16px; font-weight:800; color:#064E3B;">📍 [{selected_trip['country']}] {dest_name} 맞춤 플래너</span>
+                        <span style="background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;">🗓️ {travel_month_num}월 출발 · {duration_label}</span>
+                        <span style="background:#FAF8F5; border:1px solid #E5E0D5; color:#375346; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px;">👥 {comp_short}</span>
+                    </div>
+                    <div style="font-size:12px; color:#375346;">
+                        ✨ <b>선호 취향</b>: {styles_short} · ⏰ <b>템포</b>: {pace_short} · 🛡️ <b>식이</b>: {diet_short}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-
-        p_row2_c1, p_row2_c2, p_row2_c3 = st.columns([1.6, 0.95, 1.3], gap="medium")
-        with p_row2_c1:
-            style_choices = st.multiselect(
-                "✨ 선호하는 여행 취향 (다중 선택)",
-                [
-                    "☕ 감성 카페 & 힐링",
-                    "🍣 현지 미식 & 로컬 맛집",
-                    "🏛️ 문화 예술 & 역사 유적",
-                    "📸 인생샷 포토존",
-                    "🌿 자연 & 산책 힐링",
-                    "🛍️ 쇼핑 & 소품샵",
-                    "🌃 야경 & 루프탑",
-                    "🎢 액티비티 & 체험",
-                ],
-                default=["☕ 감성 카페 & 힐링", "🍣 현지 미식 & 로컬 맛집"],
-                key=f"styles_{trip_id}",
-            )
-        with p_row2_c2:
-            pace_choice = st.selectbox(
-                "⏰ 일정 템포",
-                ["😌 여유롭게 (힐링)", "👟 알차게 (핵심 정복)", "😴 늦잠 모드 (11시)"],
-                key=f"pace_{trip_id}",
-            )
-        with p_row2_c3:
-            dietary_choices = st.multiselect(
-                "🛡️ 알러지·식이제한·배려",
-                [
-                    "✅ 해당 없음 (알러지 없음)",
-                    "🚫 생선·해산물 알러지 (육류 대체)",
-                    "🚫 갑각류(새우·게) 알러지",
-                    "🥜 견과류·땅콩 알러지",
-                    "🥗 비건·채식 위주 식단",
-                    "🥩 돼지고기 제외 (할랄)",
-                    "♿ 계단 최소화·택시 이동",
-                ],
-                default=["✅ 해당 없음 (알러지 없음)"],
-                key=f"diet_{trip_id}",
-            )
-
-    if target_days == 1:
-        duration_label = "당일치기"
-    elif target_days == 30:
-        duration_label = "29박 30일 (한달살기)"
-    elif target_days == 7:
-        duration_label = "6박 7일 (1주일)"
-    elif target_days == 14:
-        duration_label = "13박 14일 (2주 살기)"
-    elif target_days == 21:
-        duration_label = "20박 21일 (3주 살기)"
-    else:
-        duration_label = f"{target_days-1}박 {target_days}일"
-
-    chat_constraints_list = st.session_state.chat_constraints_by_trip.get(trip_id, [])
-    active_dietary = [c for c in dietary_choices if "해당 없음" not in c and "알러지 없음" not in c]
-    all_constraints = list(active_dietary) + [c for c in chat_constraints_list if c not in active_dietary and "해당 없음" not in c and "알러지 없음" not in c]
-    constraint_str = f", 필수 배려·식이제한: {', '.join(all_constraints)}" if all_constraints else ""
-    user_pref_summary = (
-        f"{companion_choice}, 기간: {duration_label} (총 {target_days}일), "
-        f"선호 테마: {', '.join(style_choices) or '힐링/미식'}, "
-        f"템포: {pace_choice}, 출발 예정: {travel_month_num}월{constraint_str}"
-    )
+        with br_c2:
+            active_bg_task = get_active_task_for_trip(trip_id)
+            btn_disabled = (active_bg_task is not None)
+            btn_top_label = f"⏳ 백그라운드 추론 중..." if btn_disabled else f"🚀 {dest_name} {duration_label} 일정 생성"
+            if st.button(
+                btn_top_label,
+                key=f"btn_gen_top_{trip_id}",
+                type="primary",
+                use_container_width=True,
+                disabled=btn_disabled,
+            ):
+                submit_itinerary_task(
+                    trip_id=trip_id,
+                    dest_name=dest_name,
+                    country=selected_trip["country"],
+                    theme=selected_trip.get("theme", ""),
+                    user_pref_summary=user_pref_summary,
+                    current_plan=st.session_state.itinerary_by_trip.get(trip_id, {}).get("structured_plan"),
+                    top_k_val=top_k_val,
+                    chunk_size_val=chunk_size_val,
+                    chunk_overlap_val=chunk_overlap_val,
+                    force_recollect=force_recollect,
+                    target_days=target_days,
+                    duration_label=duration_label,
+                )
+                st.toast(f"🚀 파일럿 토리가 '{dest_name}' {duration_label} 일정 설계를 백그라운드에서 시작했습니다!", icon="🐣")
+                st.rerun()
 
     # 💱 실시간 체감 환율 및 현지 물가 지표 바
     currency_info = get_currency_and_cost_info(selected_trip["country"])
