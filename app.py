@@ -10,6 +10,7 @@ import os
 import sys
 import html
 import json
+import time
 import urllib.parse
 import streamlit as st
 import streamlit.components.v1 as components
@@ -29,7 +30,7 @@ from config import (
     CHUNK_OVERLAP,
     WIKI_TOP_K,
 )
-from index_metadata import get_collection_count
+from index_metadata import get_collection_count, load_and_index_metadata, METADATA_JSON_PATH
 from collect_and_index_wiki import process_wiki_for_destination, load_wiki_cache
 from core_rag import (
     query_trip_pilot,
@@ -1574,10 +1575,13 @@ meta_count = get_collection_count(META_COLLECTION)
 wiki_count = get_collection_count(WIKI_COLLECTION)
 
 if meta_count == 0:
-    st.warning(
-        "⚠️ 현재 색인된 여행지 메타데이터가 0건입니다. "
-        "터미널에서 `python src/index_metadata.py`를 실행해 메타데이터를 색인해 주세요."
-    )
+    with st.spinner("🚀 초기 실행 감지: 여행지 메타데이터 100선 벡터 색인을 자동으로 구축하고 있습니다..."):
+        try:
+            load_and_index_metadata(METADATA_JSON_PATH)
+            meta_count = get_collection_count(META_COLLECTION)
+            st.success("✅ 메타데이터 벡터 색인 자동 구축 완료!")
+        except Exception as e:
+            st.warning(f"메타데이터 색인 안내: {e}")
 
 # 3. 세션 상태 초기화
 if "messages_by_trip" not in st.session_state:

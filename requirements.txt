@@ -13,3 +13,4 @@ requests==2.34.2
 python-dotenv==1.2.3
 typing-extensions==4.16.0
 fpdf2==2.8.9
+Pillow==12.3.0
