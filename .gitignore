@@ -7,3 +7,12 @@ __pycache__/
 .DS_Store
 *.log
 .pytest_cache/
+
+# Test outputs & caches
+data/tile_cache/
+data/test_output/
+data/*.png
+data/*.jpg
+data/*.pdf
+data/*.html
+scratch/

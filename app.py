@@ -10,6 +10,7 @@ import os
 import sys
 import html
 import json
+import urllib.parse
 import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
@@ -50,6 +51,28 @@ from core_rag import (
     get_monthly_packing_and_weather,
     safe_md,
 )
+import importlib
+import nature_visuals
+from background_inference import (
+    submit_itinerary_task,
+    submit_chat_task,
+    get_active_task_for_trip,
+    sync_completed_background_tasks,
+    get_any_completed_tasks_for_trip,
+)
+try:
+    importlib.reload(nature_visuals)
+except Exception:
+    pass
+from nature_visuals import (
+    get_destination_visuals,
+    render_nature_hero_html,
+    render_nature_gallery_html,
+    render_pilot_tori_mascot_html,
+    render_flying_tori_overlay_html,
+    get_pilot_tori_b64,
+)
+from publish_mobile_itinerary import publish_itinerary_to_mobile_web
 
 load_dotenv()
 
@@ -99,1900 +122,422 @@ URBAN_FUTURISTIC_DESTINATIONS = {
 
 
 def detect_destination_vibe(trip_item: dict) -> str:
-    """
-    여행지의 지리·문화적 성격에 맞춰 4대 공간 공감(Spatial Empathy) 비주얼 테마를 자동 판별:
-    1) 'winter'   : ❄️ 오로라 & 윈터 원더랜드 (설경/스키/오로라/빙하)
-    2) 'heritage' : 🏛️ 클래식 헤리티지 & 선셋 골드 (역사/유적/고도/예술)
-    3) 'cyber'    : ⚡ 사이버 네온 퓨처 (대도시/마천루/야경/쇼핑)
-    4) 'nature'   : 🌿 네이처 & 오션 웨이브 (자연/해양/휴양/섬/리조트)
-    """
-    name = trip_item.get("name", "")
-    theme = trip_item.get("theme", "")
-    summary = trip_item.get("summary", "")
-
-    winter_keywords = ["설경", "스키", "오로라", "빙하", "눈", "겨울", "북극", "알프스"]
-    heritage_keywords = ["역사", "유적", "문화재", "사찰", "고도", "궁전", "성당", "세계문화유산", "신사", "고대", "유산"]
-    nature_keywords = ["자연", "휴양", "해양", "리조트", "온천", "사파리", "사막", "폭포", "협곡", "섬", "산악", "와인"]
-    urban_keywords = ["도시", "쇼핑", "테마파크", "마천루", "야경", "현대적인", "카지노", "첨단"]
-
-    if name in WINTER_SNOW_DESTINATIONS or any(k in theme for k in winter_keywords) or any(k in summary for k in ["눈 덮인", "설경", "오로라"]):
-        return "winter"
-    if name in HERITAGE_CLASSIC_DESTINATIONS or any(k in theme for k in heritage_keywords):
-        return "heritage"
-    if name in URBAN_FUTURISTIC_DESTINATIONS:
-        return "cyber"
-    if any(k in theme for k in nature_keywords):
-        return "nature"
-    if any(k in theme for k in urban_keywords) or any(k in summary for k in ["마천루", "야경", "쇼핑몰", "대도시"]):
-        return "cyber"
+    """자연과 쉼이 어우러진 눈이 편안한 밝은 오트밀 & 포레스트 그린 테마로 단일 고정"""
     return "nature"
 
 
-def inject_theme_css_and_background(vibe_mode: str, dest_name: str) -> None:
+def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = "") -> None:
     """
-    TripPilot 디자인 철학 — 'Spatial Empathy & Adaptive Contrast (공간 공감형 적응 디자인)'
-    - 🌿 Biophilic Serenity (nature): 숲의 피톤치드(#064E3B~#10B981)와 파도 윤슬(#F7FDF9)을 결합한 바이오필릭 화이트·그린 테마.
-      OS 다크모드 환경에서도 흰 글씨가 흰 배경에 묻히지 않도록 모든 본문·라벨·입력창·보조 버튼에 딥 포레스트 차콜(#0F291E, 명도 대비 13.5:1)을 강제 적용.
-    - ⚡ Neo-Urban Horizon (cyber): 야간 비행 콕핏(HUD)과 메가시티 네온 스카이라인에서 영감을 받은 심해 네이비(#040711) & 네온 시안(#00F5D4)·바이올렛(#A855F7) 다크 테마.
-    - 화면 너비(Viewport)에 따라 버튼 크기·폰트·그리드가 유연하게 반응하는 Fluid Responsive Button System 적용.
+    TripPilot 단일 통일 테마 — Warm Oatmeal (#FAF8F5) & Biophilic Forest Green (#064E3B)
+    - 배경: 따뜻하고 눈이 편안한 밝은 오트밀/아이보리 (#FAF8F5 ~ #F5F1EB)
+    - 타이포그래피 & 버튼: 딥 포레스트 그린 (#064E3B, #0F291E)과 파스텔 에메랄드 (#ECFDF5)
+    - 실사 풍경 포토와 히어로 배너 내 텍스트는 100% 순백색(#FFFFFF) 고대비 보장
     """
-    if vibe_mode == "nature":
-        # 🌿 그린 + 화이트 + 잔잔하게 밀려오는 에메랄드 파도 & 바이오필릭 고대비 타이포그래피
-        css_and_bg = """
-        <style>
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+    css_and_bg = """
+    <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
 
-        :root {
-            color-scheme: light !important;
-            --primary-color: #059669 !important;
-            --background-color: #F7FDF9 !important;
-            --secondary-background-color: #ECFDF5 !important;
-            --text-color: #0F291E !important;
-            --bg-primary: #F7FDF9;
-            --card-bg: rgba(255, 255, 255, 0.90);
-            --card-border: rgba(16, 185, 129, 0.24);
-            --accent-main: #10B981;
-            --accent-deep: #059669;
-            --accent-soft: #ECFDF5;
-            --text-main: #0F291E;
-            --text-sub: #2C5243;
-            --text-muted: #47695B;
-            --shadow-soft: 0 14px 36px -10px rgba(5, 150, 105, 0.10);
-        }
+    :root {
+        color-scheme: light !important;
+        --primary-color: #059669 !important;
+        --background-color: #FAF8F5 !important;
+        --secondary-background-color: #F3EFEA !important;
+        --text-color: #0F291E !important;
+    }
 
-        html, body, [class*="css"] {
-            font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            color: #0F291E !important;
-        }
+    html, body, [class*="css"] {
+        font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        color: #0F291E !important;
+        scroll-behavior: smooth !important;
+    }
 
-        /* Streamlit 기본 배경 및 전체 텍스트 고대비(Deep Forest Charcoal) 강제 적용 */
-        .stApp {
-            background: linear-gradient(180deg, #FFFFFF 0%, #F4FBF7 48%, #E6F8EF 100%) !important;
-            color: #0F291E !important;
-        }
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-        }
-        .main .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 1.4rem !important;
-            padding-bottom: 6rem !important;
-            padding-left: clamp(1rem, 2.5vw, 2.5rem) !important;
-            padding-right: clamp(1rem, 2.5vw, 2.5rem) !important;
-            max-width: 1520px !important;
-        }
+    /* 전체 앱 배경: 부드러운 밝은 오트밀(아이보리) 그라데이션 */
+    .stApp {
+        background: linear-gradient(180deg, #FAF8F5 0%, #F5F1EB 55%, #EFE9E0 100%) !important;
+        color: #0F291E !important;
+    }
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+    .main .block-container {
+        position: relative;
+        z-index: 2;
+        padding-top: 1.2rem !important;
+        padding-bottom: 5rem !important;
+        padding-left: clamp(1rem, 2.4vw, 2.6rem) !important;
+        padding-right: clamp(1rem, 2.4vw, 2.6rem) !important;
+        max-width: 1540px !important;
+    }
 
-        /* 화이트 테마에서 흰 글씨가 나오는 현상 원천 차단 (마크다운·라벨·캡션·위젯·표 전체) */
-        div[data-testid="stMarkdownContainer"],
-        div[data-testid="stMarkdownContainer"] p,
-        div[data-testid="stMarkdownContainer"] li,
-        div[data-testid="stMarkdownContainer"] span,
-        div[data-testid="stMarkdownContainer"] strong,
-        div[data-testid="stText"],
-        label[data-testid="stWidgetLabel"],
-        label[data-testid="stWidgetLabel"] p,
-        label[data-testid="stWidgetLabel"] span,
-        div[data-testid="stRadio"] label span,
-        div[data-testid="stCheckbox"] label span,
-        div[data-testid="stExpander"] summary span,
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stStatusWidget"] *,
-        div[data-testid="stMetricLabel"] *,
-        div[data-testid="stMetricValue"] *,
-        .stTable th, .stTable td, table th, table td {
-            color: #0F291E !important;
-        }
-        div[data-testid="stMarkdownContainer"] h1,
-        div[data-testid="stMarkdownContainer"] h2,
-        div[data-testid="stMarkdownContainer"] h3,
-        div[data-testid="stMarkdownContainer"] h4 {
-            color: #064E3B !important;
-            letter-spacing: -0.02em;
-        }
-        div[data-testid="stCaptionContainer"],
-        div[data-testid="stCaptionContainer"] p,
-        div[data-testid="stCaptionContainer"] span {
-            color: #3D6354 !important;
-        }
-        div[data-testid="stMarkdownContainer"] a {
-            color: #047857 !important;
-            font-weight: 700 !important;
-        }
-        div[data-testid="stMarkdownContainer"] code {
-            background: #ECFDF5 !important;
-            color: #065F46 !important;
-            border: 1px solid #A7F3D0 !important;
-            padding: 2px 6px !important;
-            border-radius: 6px !important;
-        }
+    /* 물결표(~) 범위 표기 시 GFM strikethrough 오작동 방지 */
+    del, s, strike {
+        text-decoration: none !important;
+        color: inherit !important;
+        background: transparent !important;
+    }
 
-        /* 입력창·셀렉트박스·멀티셀렉트·숫자입력창·채팅 입력창 화이트+그린 고대비 스타일 */
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div,
-        div[data-baseweb="base-input"],
-        div[data-baseweb="textarea"],
-        div[data-testid="stNumberInputContainer"] {
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            border: 1.5px solid rgba(16, 185, 129, 0.40) !important;
-            color: #0F291E !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="select"] div,
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] input,
-        div[data-baseweb="input"] input,
-        div[data-baseweb="base-input"] input,
-        div[data-baseweb="textarea"] textarea {
-            color: #0F291E !important;
-            -webkit-text-fill-color: #0F291E !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="select"] svg {
-            fill: #047857 !important;
-            color: #047857 !important;
-        }
-        /* 멀티셀렉트 선택 태그(Tag) */
-        span[data-baseweb="tag"] {
-            background: #ECFDF5 !important;
-            background-color: #ECFDF5 !important;
-            border: 1px solid #10B981 !important;
-            color: #065F46 !important;
-            border-radius: 8px !important;
-        }
-        span[data-baseweb="tag"] span,
-        span[data-baseweb="tag"] svg {
-            color: #065F46 !important;
-            fill: #065F46 !important;
-            -webkit-text-fill-color: #065F46 !important;
-            font-weight: 700 !important;
-        }
-        /* 드롭다운 팝오버 메뉴 */
-        ul[data-testid="stSelectboxVirtualDropdown"],
-        div[data-baseweb="popover"] ul,
-        div[data-baseweb="menu"],
-        div[role="listbox"] {
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            border: 1.5px solid #6EE7B7 !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="popover"] li,
-        div[data-baseweb="menu"] li,
-        div[role="option"],
-        ul[data-testid="stSelectboxVirtualDropdown"] li {
-            color: #0F291E !important;
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="popover"] li *,
-        div[role="option"] *,
-        ul[data-testid="stSelectboxVirtualDropdown"] li * {
-            color: #0F291E !important;
-        }
-        div[data-baseweb="popover"] li:hover,
-        div[role="option"]:hover,
-        ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
-            background: #ECFDF5 !important;
-            background-color: #ECFDF5 !important;
-            color: #047857 !important;
-        }
-        /* 하단 채팅 입력창 */
-        div[data-testid="stChatInput"],
-        div[data-testid="stChatInput"] > div {
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
-            color: #0F291E !important;
-            border-radius: 16px !important;
-        }
-        div[data-testid="stChatInput"] textarea {
-            color: #0F291E !important;
-            -webkit-text-fill-color: #0F291E !important;
-            font-weight: 600 !important;
-        }
-        div[data-testid="stChatInput"] textarea::placeholder {
-            color: #5C8374 !important;
-            -webkit-text-fill-color: #5C8374 !important;
-        }
+    /* 본문 텍스트: 딥 포레스트 차콜(#0F291E) 고대비 */
+    div[data-testid="stMarkdownContainer"],
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] li,
+    div[data-testid="stMarkdownContainer"] span,
+    div[data-testid="stMarkdownContainer"] strong,
+    div[data-testid="stText"],
+    label[data-testid="stWidgetLabel"],
+    label[data-testid="stWidgetLabel"] p,
+    label[data-testid="stWidgetLabel"] span,
+    div[data-testid="stRadio"] label span,
+    div[data-testid="stCheckbox"] label span,
+    div[data-testid="stExpander"] summary span,
+    div[data-testid="stExpander"] summary p,
+    div[data-testid="stStatusWidget"] *,
+    .stTable th, .stTable td, table th, table td {
+        color: #0F291E !important;
+    }
+    div[data-testid="stMarkdownContainer"] h1,
+    div[data-testid="stMarkdownContainer"] h2,
+    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] h4 {
+        color: #064E3B !important;
+        letter-spacing: -0.02em;
+    }
+    div[data-testid="stCaptionContainer"],
+    div[data-testid="stCaptionContainer"] p,
+    div[data-testid="stCaptionContainer"] span {
+        color: #375346 !important;
+    }
+    div[data-testid="stMarkdownContainer"] a {
+        color: #047857 !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stMarkdownContainer"] code {
+        background: #ECFDF5 !important;
+        color: #065F46 !important;
+        border: 1px solid #A7F3D0 !important;
+        padding: 2px 6px !important;
+        border-radius: 6px !important;
+    }
 
-        /* 사이드바: 깔끔한 화이트-민트 글래스 */
-        section[data-testid="stSidebar"] {
-            background: rgba(255, 255, 255, 0.96) !important;
-            backdrop-filter: blur(20px) !important;
-            border-right: 1px solid rgba(16, 185, 129, 0.24) !important;
-        }
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] h4 {
-            color: #0F291E !important;
-        }
+    /* ── [히어로 배너 내부 텍스트 & [일본] 도쿄 순백색(#FFFFFF) 영구 보장] ── */
+    div[data-testid="stMarkdownContainer"] .nature-hero-card,
+    div[data-testid="stMarkdownContainer"] .nature-hero-card *,
+    div[data-testid="stMarkdownContainer"] .nature-hero-heading,
+    div[data-testid="stMarkdownContainer"] .nature-hero-heading *,
+    div[data-testid="stMarkdownContainer"] .nature-hero-heading-badge,
+    div[data-testid="stMarkdownContainer"] .nature-hero-heading-badge * {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
 
-        /* 컨테이너 & 카드 미니멀 글래스모피즘 */
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(255, 255, 255, 0.92) !important;
-            backdrop-filter: blur(16px) !important;
-            border: 1px solid rgba(16, 185, 129, 0.24) !important;
-            border-radius: 22px !important;
-            box-shadow: 0 12px 32px -10px rgba(5, 150, 105, 0.09) !important;
-            padding: clamp(14px, 1.4vw, 20px) !important;
-            transition: transform 0.22s ease, box-shadow 0.22s ease !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            border-color: rgba(16, 185, 129, 0.42) !important;
-            box-shadow: 0 16px 38px -10px rgba(5, 150, 105, 0.15) !important;
-        }
+    /* ── [메트릭 줄임표(...) 방지 & 워드랩 가독성 최적화] ── */
+    div[data-testid="stMetricValue"],
+    div[data-testid="stMetricValue"] * {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: keep-all !important;
+        font-size: clamp(15px, 1.25vw, 19px) !important;
+        line-height: 1.35 !important;
+    }
+    div[data-testid="stMetricLabel"],
+    div[data-testid="stMetricLabel"] * {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: keep-all !important;
+    }
 
-        /* 익스팬더 & 상태 위젯 화이트 글래스 고정 */
-        details[data-testid="stExpander"],
-        div[data-testid="stStatusWidget"] {
-            background: rgba(255, 255, 255, 0.94) !important;
-            border: 1px solid rgba(16, 185, 129, 0.28) !important;
-            border-radius: 16px !important;
-        }
+    /* 입력창 및 셀렉트박스 */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="base-input"],
+    div[data-baseweb="textarea"],
+    div[data-testid="stNumberInputContainer"] {
+        background: #FFFFFF !important;
+        background-color: #FFFFFF !important;
+        border: 1.5px solid rgba(16, 185, 129, 0.40) !important;
+        color: #0F291E !important;
+        border-radius: 12px !important;
+    }
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] input,
+    div[data-baseweb="input"] input,
+    div[data-baseweb="base-input"] input,
+    div[data-baseweb="textarea"] textarea {
+        color: #0F291E !important;
+        -webkit-text-fill-color: #0F291E !important;
+        font-weight: 600 !important;
+    }
+    span[data-baseweb="tag"] {
+        background: #ECFDF5 !important;
+        background-color: #ECFDF5 !important;
+        border: 1px solid #10B981 !important;
+        color: #065F46 !important;
+        border-radius: 8px !important;
+    }
+    span[data-baseweb="tag"] span {
+        color: #065F46 !important;
+        -webkit-text-fill-color: #065F46 !important;
+        font-weight: 700 !important;
+    }
 
-        /* 📐 반응형 버튼 & 다운로드 버튼 시스템 (화면 크기에 맞춰 유연하게 리사이즈 & 내부 텍스트 색상 완벽 고정) */
-        .stButton > button,
-        .stDownloadButton > button {
-            width: 100%;
-            min-height: 42px !important;
-            border-radius: 14px !important;
-            font-weight: 700 !important;
-            font-size: clamp(11.8px, 0.82vw, 13.5px) !important;
-            line-height: 1.3 !important;
-            padding: clamp(6px, 0.55vw, 10px) clamp(10px, 0.9vw, 16px) !important;
-            word-break: keep-all !important;
-            white-space: normal !important;
-            border: 1.5px solid rgba(16, 185, 129, 0.40) !important;
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            color: #065F46 !important;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.07) !important;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            text-align: center !important;
-        }
-        /* 보조 버튼 및 다운로드 버튼 내부의 p, span 텍스트를 짙은 에메랄드(#065F46)로 강제 고정 */
-        .stButton > button:not([kind="primary"]) *,
-        .stButton > button[kind="secondary"] *,
-        .stDownloadButton > button * {
-            color: #065F46 !important;
-            font-weight: 700 !important;
-        }
-        .stButton > button:not([kind="primary"]):hover,
-        .stDownloadButton > button:hover {
-            background: #ECFDF5 !important;
-            background-color: #ECFDF5 !important;
-            border-color: #059669 !important;
-            color: #047857 !important;
-            transform: translateY(-1.5px) !important;
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.16) !important;
-        }
-        .stButton > button:not([kind="primary"]):hover *,
-        .stDownloadButton > button:hover * {
-            color: #047857 !important;
-        }
-        /* 프라이머리 버튼: 짙은 에메랄드 그라데이션 + 순백색(#FFFFFF) 글씨 강제 고정 */
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-            color: #FFFFFF !important;
-            border: none !important;
-            box-shadow: 0 8px 22px -4px rgba(5, 150, 105, 0.42) !important;
-        }
-        .stButton > button[kind="primary"] *,
-        .stButton > button[kind="primary"] p,
-        .stButton > button[kind="primary"] span {
-            color: #FFFFFF !important;
-            font-weight: 800 !important;
-        }
-        .stButton > button[kind="primary"]:hover {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-            color: #FFFFFF !important;
-            box-shadow: 0 12px 26px -4px rgba(4, 120, 87, 0.55) !important;
-        }
+    /* 사이드바 */
+    section[data-testid="stSidebar"] {
+        background: rgba(253, 252, 250, 0.96) !important;
+        backdrop-filter: blur(20px) !important;
+        border-right: 1px solid rgba(6, 78, 59, 0.16) !important;
+    }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4 {
+        color: #0F291E !important;
+    }
 
-        /* 탭 디자인: 미니멀 필 탭 (반응형 간격) */
-        div[data-baseweb="tab-list"] {
-            gap: clamp(4px, 0.6vw, 10px) !important;
-            flex-wrap: wrap !important;
-        }
-        button[data-baseweb="tab"] {
-            font-weight: 700 !important;
-            font-size: clamp(12.5px, 0.9vw, 14.5px) !important;
-            color: #3D6354 !important;
-            padding: 10px clamp(12px, 1.2vw, 20px) !important;
-            white-space: nowrap !important;
-        }
-        button[data-baseweb="tab"] * {
-            color: #3D6354 !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"],
-        button[data-baseweb="tab"][aria-selected="true"] * {
-            color: #047857 !important;
-            font-weight: 800 !important;
-        }
+    /* 카드 및 컨테이너 */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(255, 255, 255, 0.94) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1.2px solid rgba(6, 78, 59, 0.18) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 8px 24px -6px rgba(15, 41, 30, 0.07) !important;
+        padding: clamp(14px, 1.4vw, 20px) !important;
+    }
 
-        /* 채팅 메시지 버블 */
-        div[data-testid="stChatMessage"] {
-            background: rgba(255, 255, 255, 0.94) !important;
-            border: 1px solid rgba(16, 185, 129, 0.22) !important;
-            border-radius: 18px !important;
-            padding: 12px 16px !important;
-            margin-bottom: 10px !important;
-            box-shadow: 0 4px 14px rgba(5, 150, 105, 0.06) !important;
-        }
+    /* 버튼 스타일 */
+    .stButton > button,
+    .stDownloadButton > button {
+        width: 100%;
+        min-height: 42px !important;
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        font-size: clamp(12px, 0.85vw, 14px) !important;
+        line-height: 1.3 !important;
+        border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
+        background: #FFFFFF !important;
+        color: #065F46 !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08) !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton > button:not([kind="primary"]) *,
+    .stDownloadButton > button * {
+        color: #065F46 !important;
+        font-weight: 700 !important;
+    }
+    .stButton > button:not([kind="primary"]):hover,
+    .stDownloadButton > button:hover {
+        background: #ECFDF5 !important;
+        border-color: #059669 !important;
+        color: #047857 !important;
+        transform: translateY(-1.5px) !important;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        box-shadow: 0 8px 20px -4px rgba(5, 150, 105, 0.40) !important;
+    }
+    .stButton > button[kind="primary"] * {
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+    }
 
-        /* 화면 폭(태블릿·작은 노트북·모바일)에 맞춘 반응형 컬럼/버튼 자동 줄바꿈 */
-        @media (max-width: 1200px) {
-            div[data-testid="stHorizontalBlock"] {
-                flex-wrap: wrap !important;
-                gap: 8px !important;
-            }
-            div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
-            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-                min-width: calc(50% - 8px) !important;
-                flex: 1 1 calc(50% - 8px) !important;
-            }
-        }
-        @media (max-width: 680px) {
-            div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
-            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-                min-width: 100% !important;
-                flex: 1 1 100% !important;
-            }
-        }
+    /* 채팅 메시지 버블 */
+    div[data-testid="stChatMessage"] {
+        background: rgba(255, 255, 255, 0.96) !important;
+        border: 1px solid rgba(16, 185, 129, 0.22) !important;
+        border-radius: 18px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.05) !important;
+    }
 
-        /* 물결표(~) 범위 표기 시 GFM strikethrough 오작동으로 인한 텍스트 가로줄(----) 완전 무효화 */
-        del, s, strike {
-            text-decoration: none !important;
-            color: inherit !important;
-            background: transparent !important;
-        }
+    
+    /* 사이드바 파일럿 토리 위젯 */
+    .tori-mascot-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #FFFFFF !important;
+        border: 1.5px solid rgba(16, 185, 129, 0.35) !important;
+        border-radius: 18px !important;
+        padding: 10px 14px !important;
+        margin-bottom: 14px !important;
+        box-shadow: 0 4px 14px rgba(15, 41, 30, 0.05) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    }
+    .tori-mascot-wrapper:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 20px rgba(15, 41, 30, 0.10) !important;
+        border-color: #059669 !important;
+    }
+    .tori-mascot-avatar {
+        width: 48px !important;
+        height: 48px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        border: 2px solid #10B981 !important;
+        display: block !important;
+    }
+    .tori-mascot-info {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+        flex: 1 !important;
+    }
+    .tori-mascot-name {
+        font-size: 13.5px !important;
+        font-weight: 800 !important;
+        color: #064E3B !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .tori-live-status {
+        background: #059669 !important;
+        color: #FFFFFF !important;
+        font-size: 9.5px !important;
+        font-weight: 800 !important;
+        padding: 2px 7px !important;
+        border-radius: 999px !important;
+        letter-spacing: 0.04em !important;
+    }
+    .tori-mascot-desc {
+        font-size: 11px !important;
+        color: #375346 !important;
+        line-height: 1.35 !important;
+    }
 
-        /* 히어로 배너 (네이처 웨이브) */
-        .hero-shell {
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 245, 0.92) 100%);
-            backdrop-filter: blur(22px);
-            border: 1px solid rgba(16, 185, 129, 0.28);
-            border-radius: 26px;
-            padding: clamp(18px, 2vw, 26px) clamp(20px, 2.4vw, 30px);
-            margin-bottom: 18px;
-            box-shadow: 0 18px 42px -12px rgba(5, 150, 105, 0.12);
-        }
-        .vibe-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: linear-gradient(135deg, #10B981, #059669);
-            color: #FFFFFF !important;
-            padding: 5px 14px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        }
-        .hero-title {
-            font-size: clamp(22px, 2vw, 28px);
-            font-weight: 800;
-            color: #064E3B !important;
-            margin: 10px 0 6px 0;
-            letter-spacing: -0.02em;
-        }
-        .hero-desc {
-            font-size: clamp(13px, 0.95vw, 14.5px);
-            color: #1E3A2F !important;
-            margin: 0 0 14px 0;
-            line-height: 1.6;
-        }
-        .hero-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .hero-tag {
-            background: #FFFFFF;
-            border: 1px solid rgba(16, 185, 129, 0.35);
-            color: #047857 !important;
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-        }
+    /* ── [TripPilot 실사화 자연 디자인 시스템] ── */
+    .nature-hero-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 26px;
+        margin-bottom: 20px;
+        box-shadow: 0 16px 40px -10px rgba(15, 41, 30, 0.18);
+        border: 1.5px solid rgba(16, 185, 129, 0.45);
+        background: #143324;
+        min-height: 280px;
+        height: auto !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+    .nature-hero-backdrop {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-size: cover;
+        background-position: center 40%;
+        filter: brightness(1.02) contrast(1.04);
+        transition: transform 6s cubic-bezier(0.25, 1, 0.5, 1);
+        z-index: 1;
+    }
+    .nature-hero-card:hover .nature-hero-backdrop {
+        transform: scale(1.04);
+    }
+    .nature-hero-gradient-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(180deg, 
+            rgba(15, 41, 30, 0.06) 0%, 
+            rgba(15, 41, 30, 0.26) 45%, 
+            rgba(6, 26, 18, 0.58) 100%
+        );
+        backdrop-filter: blur(0.5px);
+        z-index: 2;
+    }
+    .nature-hero-inner {
+        position: relative;
+        z-index: 3;
+        padding: clamp(18px, 2.2vw, 28px);
+        width: 100%;
+    }
+    .nature-hero-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .nature-hero-highlights {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+    .nature-hero-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+    }
 
-        /* 일정 타임라인 카드 */
-        .timeline-card {
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid rgba(16, 185, 129, 0.26);
-            border-left: 4px solid #10B981;
-            border-radius: 18px;
-            padding: 16px 18px;
-            margin-bottom: 12px;
-            box-shadow: 0 8px 22px -8px rgba(5, 150, 105, 0.08);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .timeline-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px -6px rgba(5, 150, 105, 0.15);
-        }
-        .timeline-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .timeline-place {
-            font-size: 16px;
-            font-weight: 800;
-            color: #064E3B !important;
-        }
-        .timeline-time {
-            background: #ECFDF5;
-            color: #047857 !important;
-            border: 1px solid #A7F3D0;
-            padding: 3px 10px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .timeline-body {
-            font-size: 13.5px;
-            color: #1E3A2F !important;
-            line-height: 1.55;
-            margin-bottom: 8px;
-        }
-        .timeline-tip {
-            background: #F0FDF4;
-            border: 1px solid #BBF7D0;
-            border-radius: 10px;
-            padding: 7px 11px;
-            font-size: 12px;
-            color: #065F46 !important;
-            margin-bottom: 10px;
-        }
+    /* ── [배경 살랑살랑 나뭇잎 애니메이션] ── */
+    .ambient-stage {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+    }
+    .leaf-drift {
+        position: absolute;
+        font-size: 20px;
+        opacity: 0.35;
+        user-select: none;
+        animation: leafFloat 18s linear infinite;
+    }
+    .leaf-1 { left: 8vw; top: -10px; animation-duration: 22s; animation-delay: 0s; }
+    .leaf-2 { left: 34vw; top: -10px; animation-duration: 26s; animation-delay: 5s; font-size: 24px; }
+    .leaf-3 { left: 68vw; top: -10px; animation-duration: 20s; animation-delay: 8s; font-size: 18px; }
+    .leaf-4 { left: 88vw; top: -10px; animation-duration: 24s; animation-delay: 12s; font-size: 22px; }
 
-        /* 요약 메트릭 필 */
-        .metric-pill {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(16, 185, 129, 0.28);
-            border-radius: 16px;
-            padding: 10px 12px;
-            text-align: center;
-            box-shadow: 0 6px 18px -6px rgba(5, 150, 105, 0.08);
-        }
-        .metric-label { font-size: 11px; color: #3D6354 !important; font-weight: 700; }
-        .metric-val { font-size: clamp(12.5px, 0.9vw, 14px); font-weight: 800; color: #047857 !important; margin-top: 2px; word-break: keep-all; }
+    @keyframes leafFloat {
+        0% { transform: translateY(-30px) rotate(0deg); opacity: 0; }
+        15% { opacity: 0.45; }
+        85% { opacity: 0.45; }
+        100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
+    }
 
-        /* 원클릭 예약 칩 (반응형 플렉스 랩) */
-        .booking-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 10px;
-        }
-        .booking-chip {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            background: #FFFFFF;
-            color: #047857 !important;
-            border: 1.5px solid rgba(16, 185, 129, 0.40);
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: clamp(11px, 0.78vw, 12.5px);
-            font-weight: 700;
-            white-space: nowrap;
-            text-decoration: none !important;
-            margin-right: 4px;
-            margin-bottom: 4px;
-            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.08);
-            transition: all 0.18s ease;
-        }
-        .booking-chip:hover {
-            background: #059669;
-            color: #FFFFFF !important;
-            border-color: #059669;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 14px rgba(5, 150, 105, 0.25);
-        }
+    /* 예약 칩 링크 */
+    .booking-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #ECFDF5;
+        border: 1px solid #10B981;
+        color: #065F46 !important;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 999px;
+        text-decoration: none;
+        margin-right: 6px;
+        margin-top: 4px;
+        transition: all 0.2s ease;
+    }
+    .booking-chip:hover {
+        background: #10B981;
+        color: #FFFFFF !important;
+    }
+    </style>
 
-        /* 🌊 배경 파도 & 자연 빛 오로라 애니메이션 레이어 */
-        .ambient-stage {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-        .nature-orb-1 {
-            position: absolute;
-            top: -120px;
-            right: -80px;
-            width: 520px;
-            height: 520px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(167, 243, 208, 0.05) 55%, transparent 75%);
-            animation: floatSlow 14s ease-in-out infinite alternate;
-        }
-        .nature-orb-2 {
-            position: absolute;
-            top: 22%;
-            left: -140px;
-            width: 460px;
-            height: 460px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(20, 184, 166, 0.13) 0%, rgba(153, 246, 228, 0.04) 55%, transparent 75%);
-            animation: floatSlow 18s ease-in-out infinite alternate-reverse;
-        }
-        .wave-dock {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 220px;
-            overflow: hidden;
-            line-height: 0;
-        }
-        .wave-track {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 200%;
-            height: 100%;
-            display: flex;
-        }
-        .wave-track svg {
-            width: 50%;
-            height: 100%;
-        }
-        .wave-1 {
-            animation: waveRoll 18s linear infinite;
-            opacity: 0.85;
-        }
-        .wave-2 {
-            animation: waveRollReverse 25s linear infinite;
-            opacity: 0.65;
-            bottom: -8px;
-        }
-        .wave-3 {
-            animation: waveRoll 13s linear infinite;
-            opacity: 0.45;
-            bottom: -16px;
-        }
-        @keyframes waveRoll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-        @keyframes waveRollReverse {
-            0% { transform: translateX(-50%); }
-            100% { transform: translateX(0); }
-        }
-        @keyframes floatSlow {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(30px, 24px) scale(1.08); }
-        }
-        </style>
-
-        <div class="ambient-stage">
-            <div class="nature-orb-1"></div>
-            <div class="nature-orb-2"></div>
-            <div class="wave-dock">
-                <div class="wave-track wave-1">
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(16, 185, 129, 0.14)" d="M0,192L60,186.7C120,181,240,171,360,181.3C480,192,600,224,720,218.7C840,213,960,171,1080,160C1200,149,1320,171,1380,181.3L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(16, 185, 129, 0.14)" d="M0,192L60,186.7C120,181,240,171,360,181.3C480,192,600,224,720,218.7C840,213,960,171,1080,160C1200,149,1320,171,1380,181.3L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                </div>
-                <div class="wave-track wave-2">
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(20, 184, 166, 0.16)" d="M0,224L80,213.3C160,203,320,181,480,186.7C640,192,800,224,960,229.3C1120,235,1280,213,1360,202.7L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(20, 184, 166, 0.16)" d="M0,224L80,213.3C160,203,320,181,480,186.7C640,192,800,224,960,229.3C1120,235,1280,213,1360,202.7L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                </div>
-                <div class="wave-track wave-3">
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(5, 150, 105, 0.18)" d="M0,256L60,245.3C120,235,240,213,360,208C480,203,600,213,720,229.3C840,245,960,267,1080,261.3C1200,256,1320,224,1380,208L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(5, 150, 105, 0.18)" d="M0,256L60,245.3C120,235,240,213,360,208C480,203,600,213,720,229.3C840,245,960,267,1080,261.3C1200,256,1320,224,1380,208L1440,192L1440,320L0,320Z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-        """
-    elif vibe_mode == "heritage":
-        # 🏛️ 클래식 헤리티지 & 선셋 골드 (역사·유적·고도·예술 도시 테마)
-        css_and_bg = """
-        <style>
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
-
-        :root {
-            color-scheme: light !important;
-            --primary-color: #B45309 !important;
-            --background-color: #FDFBF7 !important;
-            --secondary-background-color: #FFFBEB !important;
-            --text-color: #271C16 !important;
-            --bg-primary: #FDFBF7;
-            --card-bg: rgba(255, 253, 248, 0.94);
-            --card-border: rgba(217, 119, 6, 0.28);
-            --accent-main: #D97706;
-            --accent-deep: #B45309;
-            --accent-soft: #FEF3C7;
-            --text-main: #271C16;
-            --text-sub: #451A03;
-            --text-muted: #78350F;
-        }
-
-        html, body, [class*="css"] {
-            font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            color: #271C16 !important;
-        }
-
-        .stApp {
-            background: linear-gradient(180deg, #FFFFFF 0%, #FAF5EC 48%, #F2E8D5 100%) !important;
-            color: #271C16 !important;
-        }
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-        }
-        .main .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 1.4rem !important;
-            padding-bottom: 6rem !important;
-            padding-left: clamp(1rem, 2.5vw, 2.5rem) !important;
-            padding-right: clamp(1rem, 2.5vw, 2.5rem) !important;
-            max-width: 1520px !important;
-        }
-
-        div[data-testid="stMarkdownContainer"],
-        div[data-testid="stMarkdownContainer"] p,
-        div[data-testid="stMarkdownContainer"] li,
-        div[data-testid="stMarkdownContainer"] span,
-        div[data-testid="stMarkdownContainer"] strong,
-        div[data-testid="stText"],
-        label[data-testid="stWidgetLabel"],
-        label[data-testid="stWidgetLabel"] p,
-        label[data-testid="stWidgetLabel"] span,
-        div[data-testid="stRadio"] label span,
-        div[data-testid="stCheckbox"] label span,
-        div[data-testid="stExpander"] summary span,
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stStatusWidget"] *,
-        div[data-testid="stMetricLabel"] *,
-        div[data-testid="stMetricValue"] *,
-        .stTable th, .stTable td, table th, table td {
-            color: #271C16 !important;
-        }
-        div[data-testid="stMarkdownContainer"] h1,
-        div[data-testid="stMarkdownContainer"] h2,
-        div[data-testid="stMarkdownContainer"] h3,
-        div[data-testid="stMarkdownContainer"] h4 {
-            color: #78350F !important;
-            letter-spacing: -0.02em;
-        }
-        div[data-testid="stCaptionContainer"],
-        div[data-testid="stCaptionContainer"] p,
-        div[data-testid="stCaptionContainer"] span {
-            color: #78350F !important;
-        }
-        div[data-testid="stMarkdownContainer"] a {
-            color: #B45309 !important;
-            font-weight: 700 !important;
-        }
-        div[data-testid="stMarkdownContainer"] code {
-            background: #FEF3C7 !important;
-            color: #92400E !important;
-            border: 1px solid #FDE68A !important;
-            padding: 2px 6px !important;
-            border-radius: 6px !important;
-        }
-
-        /* 입력창 & 셀렉트박스 골드 헤리티지 스타일 */
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div,
-        div[data-baseweb="base-input"],
-        div[data-baseweb="textarea"],
-        div[data-testid="stNumberInputContainer"] {
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
-            border: 1.5px solid rgba(217, 119, 6, 0.40) !important;
-            color: #271C16 !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="select"] div,
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] input,
-        div[data-baseweb="input"] input,
-        div[data-baseweb="base-input"] input,
-        div[data-baseweb="textarea"] textarea {
-            color: #271C16 !important;
-            -webkit-text-fill-color: #271C16 !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="select"] svg {
-            fill: #B45309 !important;
-            color: #B45309 !important;
-        }
-        span[data-baseweb="tag"] {
-            background: #FEF3C7 !important;
-            border: 1px solid #F59E0B !important;
-            color: #92400E !important;
-        }
-        span[data-baseweb="tag"] span,
-        span[data-baseweb="tag"] svg {
-            color: #92400E !important;
-            fill: #92400E !important;
-            font-weight: 700 !important;
-        }
-        ul[data-testid="stSelectboxVirtualDropdown"],
-        div[data-baseweb="popover"] ul,
-        div[data-baseweb="menu"],
-        div[role="listbox"] {
-            background: #FFFFFF !important;
-            border: 1.5px solid #FCD34D !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="popover"] li,
-        div[data-baseweb="menu"] li,
-        div[role="option"],
-        ul[data-testid="stSelectboxVirtualDropdown"] li {
-            color: #271C16 !important;
-            background: #FFFFFF !important;
-        }
-        div[data-baseweb="popover"] li:hover,
-        div[role="option"]:hover,
-        ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
-            background: #FFFBEB !important;
-            color: #B45309 !important;
-        }
-        div[data-testid="stChatInput"],
-        div[data-testid="stChatInput"] > div {
-            background: #FFFFFF !important;
-            border: 1.5px solid rgba(217, 119, 6, 0.45) !important;
-            color: #271C16 !important;
-            border-radius: 16px !important;
-        }
-        div[data-testid="stChatInput"] textarea {
-            color: #271C16 !important;
-            -webkit-text-fill-color: #271C16 !important;
-            font-weight: 600 !important;
-        }
-
-        section[data-testid="stSidebar"] {
-            background: rgba(255, 253, 248, 0.96) !important;
-            backdrop-filter: blur(20px) !important;
-            border-right: 1px solid rgba(217, 119, 6, 0.25) !important;
-        }
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] h4 {
-            color: #271C16 !important;
-        }
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(255, 253, 248, 0.94) !important;
-            backdrop-filter: blur(16px) !important;
-            border: 1px solid rgba(217, 119, 6, 0.25) !important;
-            border-radius: 22px !important;
-            box-shadow: 0 12px 32px -10px rgba(180, 83, 9, 0.10) !important;
-            padding: clamp(14px, 1.4vw, 20px) !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            border-color: rgba(217, 119, 6, 0.45) !important;
-            box-shadow: 0 16px 38px -10px rgba(180, 83, 9, 0.18) !important;
-        }
-
-        .stButton > button,
-        .stDownloadButton > button {
-            width: 100%;
-            min-height: 42px !important;
-            border-radius: 14px !important;
-            font-weight: 700 !important;
-            font-size: clamp(11.8px, 0.82vw, 13.5px) !important;
-            border: 1.5px solid rgba(217, 119, 6, 0.40) !important;
-            background: #FFFFFF !important;
-            color: #92400E !important;
-            box-shadow: 0 4px 12px rgba(180, 83, 9, 0.08) !important;
-        }
-        .stButton > button:not([kind="primary"]) *,
-        .stButton > button[kind="secondary"] *,
-        .stDownloadButton > button * {
-            color: #92400E !important;
-            font-weight: 700 !important;
-        }
-        .stButton > button:not([kind="primary"]):hover,
-        .stDownloadButton > button:hover {
-            background: #FEF3C7 !important;
-            border-color: #B45309 !important;
-            color: #78350F !important;
-        }
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #D97706 0%, #B45309 100%) !important;
-            color: #FFFFFF !important;
-            border: none !important;
-            box-shadow: 0 8px 22px -4px rgba(180, 83, 9, 0.45) !important;
-        }
-        .stButton > button[kind="primary"] *,
-        .stButton > button[kind="primary"] p,
-        .stButton > button[kind="primary"] span {
-            color: #FFFFFF !important;
-            font-weight: 800 !important;
-        }
-
-        .hero-shell {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(254, 243, 199, 0.88) 100%);
-            border: 1px solid rgba(217, 119, 6, 0.32);
-            border-radius: 26px;
-            padding: clamp(18px, 2vw, 26px) clamp(20px, 2.4vw, 30px);
-            margin-bottom: 18px;
-            box-shadow: 0 18px 42px -12px rgba(180, 83, 9, 0.14);
-        }
-        .vibe-badge {
-            background: linear-gradient(135deg, #D97706, #B45309);
-            color: #FFFFFF !important;
-            padding: 5px 14px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 800;
-        }
-        .hero-title {
-            color: #78350F !important;
-            font-size: clamp(22px, 2vw, 28px);
-            font-weight: 800;
-        }
-        .hero-desc { color: #451A03 !important; }
-        .hero-tag {
-            background: #FFFFFF;
-            border: 1px solid rgba(217, 119, 6, 0.38);
-            color: #92400E !important;
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .booking-chip {
-            background: #FFFFFF;
-            color: #92400E !important;
-            border: 1.5px solid rgba(217, 119, 6, 0.42);
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: clamp(11px, 0.78vw, 12.5px);
-            font-weight: 700;
-            text-decoration: none !important;
-            margin-right: 4px;
-            margin-bottom: 4px;
-            display: inline-flex;
-        }
-        .booking-chip:hover {
-            background: #B45309;
-            color: #FFFFFF !important;
-            border-color: #B45309;
-        }
-        .timeline-card {
-            background: rgba(255, 253, 248, 0.96);
-            border: 1px solid rgba(217, 119, 6, 0.28);
-            border-left: 4px solid #D97706;
-            border-radius: 18px;
-            padding: 16px 18px;
-            margin-bottom: 12px;
-        }
-        .timeline-place { color: #78350F !important; font-size: 16px; font-weight: 800; }
-        .timeline-time { background: #FEF3C7; color: #92400E !important; border: 1px solid #FDE68A; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-        .timeline-body { color: #451A03 !important; font-size: 13.5px; line-height: 1.55; }
-        .timeline-tip { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #78350F !important; }
-        .metric-pill { background: #FFFFFF; border: 1px solid rgba(217, 119, 6, 0.30); border-radius: 16px; padding: 10px 12px; text-align: center; }
-        .metric-label { font-size: 11px; color: #78350F !important; font-weight: 700; }
-        .metric-val { font-size: 14px; font-weight: 800; color: #B45309 !important; }
-
-        /* 🌅 클래식 헤리티지 선셋 골든 더스트 입자 애니메이션 */
-        .ambient-stage {
-            position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
-        }
-        .heritage-sun-orb {
-            position: absolute; top: -100px; right: -50px; width: 500px; height: 500px; border-radius: 50%;
-            background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(251, 191, 36, 0.06) 55%, transparent 75%);
-            animation: floatSlow 15s ease-in-out infinite alternate;
-        }
-        .dust-particle {
-            position: absolute; border-radius: 50%; background: rgba(217, 119, 6, 0.45);
-            animation: dustDrift 14s infinite linear;
-        }
-        .d1 { width: 6px; height: 6px; left: 15%; top: 90%; animation-duration: 18s; animation-delay: 0s; }
-        .d2 { width: 8px; height: 8px; left: 35%; top: 95%; animation-duration: 22s; animation-delay: 3s; }
-        .d3 { width: 5px; height: 5px; left: 60%; top: 88%; animation-duration: 16s; animation-delay: 6s; }
-        .d4 { width: 7px; height: 7px; left: 80%; top: 92%; animation-duration: 20s; animation-delay: 2s; }
-        @keyframes dustDrift {
-            0% { transform: translateY(0) scale(1); opacity: 0; }
-            30% { opacity: 0.8; }
-            80% { opacity: 0.6; }
-            100% { transform: translateY(-750px) scale(0.6); opacity: 0; }
-        }
-        </style>
-        <div class="ambient-stage">
-            <div class="heritage-sun-orb"></div>
-            <div class="dust-particle d1"></div>
-            <div class="dust-particle d2"></div>
-            <div class="dust-particle d3"></div>
-            <div class="dust-particle d4"></div>
-        </div>
-        """
-    elif vibe_mode == "winter":
-        # ❄️ 오로라 & 윈터 원더랜드 (설경/오로라/겨울 도시 테마)
-        css_and_bg = """
-        <style>
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
-
-        :root {
-            color-scheme: dark !important;
-            --primary-color: #38BDF8 !important;
-            --background-color: #061121 !important;
-            --secondary-background-color: #0B1E38 !important;
-            --text-color: #F8FAFC !important;
-            --bg-primary: #061121;
-            --card-bg: rgba(11, 30, 56, 0.85);
-            --card-border: rgba(56, 189, 248, 0.35);
-            --accent-main: #38BDF8;
-            --accent-secondary: #34D399;
-            --text-main: #F8FAFC;
-            --text-sub: #BAE6FD;
-            --text-muted: #94A3B8;
-        }
-
-        html, body, [class*="css"] {
-            font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            color: #F8FAFC !important;
-        }
-
-        .stApp {
-            background: radial-gradient(circle at 45% 10%, rgba(56, 189, 248, 0.20) 0%, transparent 45%),
-                        radial-gradient(circle at 82% 20%, rgba(52, 211, 153, 0.16) 0%, transparent 42%),
-                        linear-gradient(175deg, #050D1A 0%, #0B1E38 52%, #112B4E 100%) !important;
-            color: #F8FAFC !important;
-        }
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-        }
-        .main .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 1.4rem !important;
-            padding-bottom: 6rem !important;
-            padding-left: clamp(1rem, 2.5vw, 2.5rem) !important;
-            padding-right: clamp(1rem, 2.5vw, 2.5rem) !important;
-            max-width: 1520px !important;
-        }
-
-        div[data-testid="stMarkdownContainer"],
-        div[data-testid="stMarkdownContainer"] p,
-        div[data-testid="stMarkdownContainer"] li,
-        div[data-testid="stMarkdownContainer"] span,
-        div[data-testid="stMarkdownContainer"] strong,
-        div[data-testid="stText"],
-        label[data-testid="stWidgetLabel"],
-        label[data-testid="stWidgetLabel"] p,
-        label[data-testid="stWidgetLabel"] span,
-        div[data-testid="stRadio"] label span,
-        div[data-testid="stCheckbox"] label span,
-        div[data-testid="stExpander"] summary span,
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stStatusWidget"] *,
-        div[data-testid="stMetricLabel"] *,
-        div[data-testid="stMetricValue"] *,
-        .stTable th, .stTable td, table th, table td {
-            color: #F8FAFC !important;
-        }
-        div[data-testid="stMarkdownContainer"] h1,
-        div[data-testid="stMarkdownContainer"] h2,
-        div[data-testid="stMarkdownContainer"] h3,
-        div[data-testid="stMarkdownContainer"] h4 {
-            color: #E0F2FE !important;
-        }
-        div[data-testid="stCaptionContainer"],
-        div[data-testid="stCaptionContainer"] p,
-        div[data-testid="stCaptionContainer"] span {
-            color: #94A3B8 !important;
-        }
-        div[data-testid="stMarkdownContainer"] a {
-            color: #38BDF8 !important;
-            font-weight: 700 !important;
-        }
-        div[data-testid="stMarkdownContainer"] code {
-            background: rgba(15, 36, 68, 0.9) !important;
-            color: #38BDF8 !important;
-            border: 1px solid rgba(56, 189, 248, 0.40) !important;
-            padding: 2px 6px !important;
-            border-radius: 6px !important;
-        }
-
-        /* 입력창 & 셀렉트박스 프로스트 윈터 스타일 */
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div,
-        div[data-baseweb="base-input"],
-        div[data-baseweb="textarea"],
-        div[data-testid="stNumberInputContainer"] {
-            background: #0B1E38 !important;
-            background-color: #0B1E38 !important;
-            border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
-            color: #F8FAFC !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="select"] div,
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] input,
-        div[data-baseweb="input"] input,
-        div[data-baseweb="base-input"] input,
-        div[data-baseweb="textarea"] textarea {
-            color: #F8FAFC !important;
-            -webkit-text-fill-color: #F8FAFC !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="select"] svg {
-            fill: #38BDF8 !important;
-            color: #38BDF8 !important;
-        }
-        span[data-baseweb="tag"] {
-            background: rgba(56, 189, 248, 0.20) !important;
-            border: 1px solid #38BDF8 !important;
-            color: #E0F2FE !important;
-        }
-        span[data-baseweb="tag"] span,
-        span[data-baseweb="tag"] svg {
-            color: #E0F2FE !important;
-            fill: #E0F2FE !important;
-            font-weight: 700 !important;
-        }
-        ul[data-testid="stSelectboxVirtualDropdown"],
-        div[data-baseweb="popover"] ul,
-        div[data-baseweb="menu"],
-        div[role="listbox"] {
-            background: #0B1E38 !important;
-            border: 1.5px solid rgba(56, 189, 248, 0.50) !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="popover"] li,
-        div[data-baseweb="menu"] li,
-        div[role="option"],
-        ul[data-testid="stSelectboxVirtualDropdown"] li {
-            color: #F8FAFC !important;
-            background: #0B1E38 !important;
-        }
-        div[data-baseweb="popover"] li:hover,
-        div[role="option"]:hover,
-        ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
-            background: rgba(56, 189, 248, 0.22) !important;
-            color: #38BDF8 !important;
-        }
-        div[data-testid="stChatInput"],
-        div[data-testid="stChatInput"] > div {
-            background: #0B1E38 !important;
-            border: 1.5px solid rgba(56, 189, 248, 0.48) !important;
-            color: #F8FAFC !important;
-            border-radius: 16px !important;
-        }
-        div[data-testid="stChatInput"] textarea {
-            color: #F8FAFC !important;
-            -webkit-text-fill-color: #F8FAFC !important;
-            font-weight: 600 !important;
-        }
-
-        section[data-testid="stSidebar"] {
-            background: rgba(6, 17, 33, 0.95) !important;
-            backdrop-filter: blur(20px) !important;
-            border-right: 1px solid rgba(56, 189, 248, 0.30) !important;
-        }
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] h4 {
-            color: #F8FAFC !important;
-        }
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(11, 30, 56, 0.82) !important;
-            backdrop-filter: blur(18px) !important;
-            border: 1px solid rgba(56, 189, 248, 0.30) !important;
-            border-radius: 22px !important;
-            box-shadow: 0 14px 36px -10px rgba(56, 189, 248, 0.14) !important;
-            padding: clamp(14px, 1.4vw, 20px) !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            border-color: rgba(56, 189, 248, 0.60) !important;
-            box-shadow: 0 18px 42px -10px rgba(52, 211, 153, 0.25) !important;
-        }
-
-        .stButton > button,
-        .stDownloadButton > button {
-            width: 100%;
-            min-height: 42px !important;
-            border-radius: 14px !important;
-            font-weight: 700 !important;
-            font-size: clamp(11.8px, 0.82vw, 13.5px) !important;
-            border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
-            background: #0B1E38 !important;
-            color: #38BDF8 !important;
-            box-shadow: 0 4px 14px rgba(56, 189, 248, 0.12) !important;
-        }
-        .stButton > button:not([kind="primary"]) *,
-        .stButton > button[kind="secondary"] *,
-        .stDownloadButton > button * {
-            color: #38BDF8 !important;
-            font-weight: 700 !important;
-        }
-        .stButton > button:not([kind="primary"]):hover,
-        .stDownloadButton > button:hover {
-            background: rgba(56, 189, 248, 0.22) !important;
-            border-color: #38BDF8 !important;
-            color: #FFFFFF !important;
-        }
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #38BDF8 0%, #0284C7 50%, #6366F1 100%) !important;
-            color: #050D1A !important;
-            font-weight: 800 !important;
-            border: none !important;
-            box-shadow: 0 8px 24px -4px rgba(56, 189, 248, 0.50) !important;
-        }
-        .stButton > button[kind="primary"] *,
-        .stButton > button[kind="primary"] p,
-        .stButton > button[kind="primary"] span {
-            color: #050D1A !important;
-            font-weight: 800 !important;
-        }
-
-        .hero-shell {
-            background: linear-gradient(135deg, rgba(11, 30, 56, 0.90) 0%, rgba(15, 23, 42, 0.88) 100%);
-            border: 1px solid rgba(56, 189, 248, 0.42);
-            border-radius: 26px;
-            padding: 26px 30px;
-            margin-bottom: 18px;
-            box-shadow: 0 0 36px rgba(56, 189, 248, 0.20), 0 0 60px rgba(52, 211, 153, 0.16);
-        }
-        .vibe-badge {
-            background: linear-gradient(135deg, #38BDF8, #34D399);
-            color: #050D1A !important;
-            padding: 5px 14px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 800;
-        }
-        .hero-title {
-            color: #F8FAFC !important;
-            font-size: 28px;
-            font-weight: 800;
-            text-shadow: 0 0 16px rgba(56, 189, 248, 0.40);
-        }
-        .hero-desc { color: #BAE6FD !important; }
-        .hero-tag {
-            background: rgba(11, 30, 56, 0.9);
-            border: 1px solid rgba(56, 189, 248, 0.42);
-            color: #38BDF8 !important;
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .booking-chip {
-            background: rgba(11, 30, 56, 0.9);
-            color: #38BDF8 !important;
-            border: 1px solid rgba(56, 189, 248, 0.45);
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            text-decoration: none !important;
-            margin-right: 6px;
-            margin-bottom: 6px;
-            display: inline-flex;
-        }
-        .booking-chip:hover {
-            background: linear-gradient(135deg, #38BDF8, #34D399);
-            color: #050D1A !important;
-        }
-        .timeline-card {
-            background: rgba(11, 30, 56, 0.88);
-            border: 1px solid rgba(56, 189, 248, 0.28);
-            border-left: 4px solid #38BDF8;
-            border-radius: 18px;
-            padding: 16px 18px;
-            margin-bottom: 12px;
-        }
-        .timeline-place { color: #F8FAFC !important; font-size: 16px; font-weight: 800; }
-        .timeline-time { background: rgba(56, 189, 248, 0.18); color: #38BDF8 !important; border: 1px solid rgba(56, 189, 248, 0.42); padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-        .timeline-body { color: #E0F2FE !important; font-size: 13.5px; line-height: 1.55; }
-        .timeline-tip { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #A7F3D0 !important; }
-        .metric-pill { background: rgba(11, 30, 56, 0.88); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 12px 14px; text-align: center; }
-        .metric-label { font-size: 11px; color: #94A3B8; font-weight: 600; }
-        .metric-val { font-size: 14px; font-weight: 800; color: #38BDF8; }
-
-        /* ❄️ 윈터 원더랜드 흩날리는 눈송이(Snowfall) & 오로라 커튼 애니메이션 */
-        .ambient-stage {
-            position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
-        }
-        .aurora-ribbon {
-            position: absolute; top: -140px; left: -10%; width: 120%; height: 380px;
-            background: radial-gradient(ellipse at 50% 50%, rgba(52, 211, 153, 0.18) 0%, rgba(56, 189, 248, 0.12) 45%, transparent 70%);
-            filter: blur(40px); animation: auroraShift 16s ease-in-out infinite alternate;
-        }
-        .snow-flake {
-            position: absolute; color: #E0F2FE; font-size: 16px; opacity: 0.85;
-            animation: fallSnow 12s linear infinite;
-        }
-        .sf1 { left: 8%; top: -20px; font-size: 12px; animation-duration: 9s; animation-delay: 0s; }
-        .sf2 { left: 24%; top: -20px; font-size: 18px; animation-duration: 13s; animation-delay: 2s; }
-        .sf3 { left: 45%; top: -20px; font-size: 14px; animation-duration: 11s; animation-delay: 4s; }
-        .sf4 { left: 68%; top: -20px; font-size: 20px; animation-duration: 15s; animation-delay: 1s; }
-        .sf5 { left: 88%; top: -20px; font-size: 13px; animation-duration: 10s; animation-delay: 3s; }
-        @keyframes fallSnow {
-            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-            20% { opacity: 0.9; }
-            80% { opacity: 0.8; }
-            100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
-        }
-        @keyframes auroraShift {
-            0% { transform: skewX(-12deg) scale(1); opacity: 0.6; }
-            100% { transform: skewX(12deg) scale(1.15); opacity: 0.95; }
-        }
-        </style>
-        <div class="ambient-stage">
-            <div class="aurora-ribbon"></div>
-            <div class="snow-flake sf1">❄</div>
-            <div class="snow-flake sf2">❅</div>
-            <div class="snow-flake sf3">❄</div>
-            <div class="snow-flake sf4">❅</div>
-            <div class="snow-flake sf5">❄</div>
-        </div>
-        """
-    else:
-        # ⚡ 사이버 네온 & 미래지향적 메트로폴리스 테마 (인공/도시 여행지)
-        css_and_bg = """
-        <style>
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
-
-        :root {
-            color-scheme: dark !important;
-            --primary-color: #00F5D4 !important;
-            --background-color: #050814 !important;
-            --secondary-background-color: #0F172A !important;
-            --text-color: #F8FAFC !important;
-            --bg-primary: #050814;
-            --card-bg: rgba(13, 19, 38, 0.80);
-            --card-border: rgba(0, 245, 212, 0.30);
-            --accent-main: #00F5D4;
-            --accent-secondary: #A855F7;
-            --text-main: #F8FAFC;
-            --text-sub: #CBD5E1;
-            --text-muted: #94A3B8;
-        }
-
-        html, body, [class*="css"] {
-            font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            color: #F8FAFC !important;
-        }
-
-        .stApp {
-            background: radial-gradient(circle at 18% 12%, rgba(168, 85, 247, 0.18) 0%, transparent 38%),
-                        radial-gradient(circle at 85% 18%, rgba(0, 245, 212, 0.16) 0%, transparent 40%),
-                        linear-gradient(165deg, #040711 0%, #090D1F 52%, #0F172A 100%) !important;
-            color: #F8FAFC !important;
-        }
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-        }
-        .main .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 1.4rem !important;
-            padding-bottom: 6rem !important;
-            padding-left: clamp(1rem, 2.5vw, 2.5rem) !important;
-            padding-right: clamp(1rem, 2.5vw, 2.5rem) !important;
-            max-width: 1520px !important;
-        }
-
-        /* 다크 네온 모드 텍스트 고대비(Crystal White) 보장 */
-        div[data-testid="stMarkdownContainer"],
-        div[data-testid="stMarkdownContainer"] p,
-        div[data-testid="stMarkdownContainer"] li,
-        div[data-testid="stMarkdownContainer"] span,
-        div[data-testid="stMarkdownContainer"] strong,
-        div[data-testid="stText"],
-        label[data-testid="stWidgetLabel"],
-        label[data-testid="stWidgetLabel"] p,
-        label[data-testid="stWidgetLabel"] span,
-        div[data-testid="stRadio"] label span,
-        div[data-testid="stCheckbox"] label span,
-        div[data-testid="stExpander"] summary span,
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stStatusWidget"] *,
-        div[data-testid="stMetricLabel"] *,
-        div[data-testid="stMetricValue"] *,
-        .stTable th, .stTable td, table th, table td {
-            color: #F8FAFC !important;
-        }
-        div[data-testid="stMarkdownContainer"] h1,
-        div[data-testid="stMarkdownContainer"] h2,
-        div[data-testid="stMarkdownContainer"] h3,
-        div[data-testid="stMarkdownContainer"] h4 {
-            color: #FFFFFF !important;
-        }
-        div[data-testid="stCaptionContainer"],
-        div[data-testid="stCaptionContainer"] p,
-        div[data-testid="stCaptionContainer"] span {
-            color: #94A3B8 !important;
-        }
-        div[data-testid="stMarkdownContainer"] a {
-            color: #00F5D4 !important;
-            font-weight: 700 !important;
-        }
-        div[data-testid="stMarkdownContainer"] code {
-            background: rgba(15, 23, 42, 0.9) !important;
-            color: #00F5D4 !important;
-            border: 1px solid rgba(0, 245, 212, 0.35) !important;
-            padding: 2px 6px !important;
-            border-radius: 6px !important;
-        }
-
-        /* 사이드바: 다크 홀로그램 글래스 */
-        section[data-testid="stSidebar"] {
-            background: rgba(8, 12, 26, 0.96) !important;
-            backdrop-filter: blur(22px) !important;
-            border-right: 1px solid rgba(0, 245, 212, 0.28) !important;
-        }
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] h4 {
-            color: #F8FAFC !important;
-        }
-
-        /* 입력창 및 셀렉트박스·멀티셀렉트·숫자입력창·채팅창 다크 네온 고대비 대응 */
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div,
-        div[data-baseweb="base-input"],
-        div[data-baseweb="textarea"],
-        div[data-testid="stNumberInputContainer"] {
-            background: #0F172A !important;
-            background-color: #0F172A !important;
-            border: 1.5px solid rgba(0, 245, 212, 0.42) !important;
-            color: #F8FAFC !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="select"] div,
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] input,
-        div[data-baseweb="input"] input,
-        div[data-baseweb="base-input"] input,
-        div[data-baseweb="textarea"] textarea {
-            color: #F8FAFC !important;
-            -webkit-text-fill-color: #F8FAFC !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="select"] svg {
-            fill: #00F5D4 !important;
-            color: #00F5D4 !important;
-        }
-        span[data-baseweb="tag"] {
-            background: rgba(0, 245, 212, 0.18) !important;
-            background-color: rgba(0, 245, 212, 0.18) !important;
-            border: 1px solid rgba(0, 245, 212, 0.55) !important;
-            color: #00F5D4 !important;
-            border-radius: 8px !important;
-        }
-        span[data-baseweb="tag"] span,
-        span[data-baseweb="tag"] svg {
-            color: #00F5D4 !important;
-            fill: #00F5D4 !important;
-            -webkit-text-fill-color: #00F5D4 !important;
-            font-weight: 700 !important;
-        }
-        ul[data-testid="stSelectboxVirtualDropdown"],
-        div[data-baseweb="popover"] ul,
-        div[data-baseweb="menu"],
-        div[role="listbox"] {
-            background: #0F172A !important;
-            background-color: #0F172A !important;
-            border: 1.5px solid rgba(0, 245, 212, 0.45) !important;
-            border-radius: 12px !important;
-        }
-        div[data-baseweb="popover"] li,
-        div[data-baseweb="menu"] li,
-        div[role="option"],
-        ul[data-testid="stSelectboxVirtualDropdown"] li {
-            color: #F8FAFC !important;
-            background: #0F172A !important;
-            background-color: #0F172A !important;
-            font-weight: 600 !important;
-        }
-        div[data-baseweb="popover"] li *,
-        div[role="option"] *,
-        ul[data-testid="stSelectboxVirtualDropdown"] li * {
-            color: #F8FAFC !important;
-        }
-        div[data-baseweb="popover"] li:hover,
-        div[role="option"]:hover,
-        ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
-            background: rgba(0, 245, 212, 0.20) !important;
-            background-color: rgba(0, 245, 212, 0.20) !important;
-            color: #00F5D4 !important;
-        }
-        div[data-testid="stChatInput"],
-        div[data-testid="stChatInput"] > div {
-            background: #0F172A !important;
-            background-color: #0F172A !important;
-            border: 1.5px solid rgba(0, 245, 212, 0.45) !important;
-            color: #F8FAFC !important;
-            border-radius: 16px !important;
-        }
-        div[data-testid="stChatInput"] textarea {
-            color: #F8FAFC !important;
-            -webkit-text-fill-color: #F8FAFC !important;
-            font-weight: 600 !important;
-        }
-        div[data-testid="stChatInput"] textarea::placeholder {
-            color: #94A3B8 !important;
-            -webkit-text-fill-color: #94A3B8 !important;
-        }
-
-        /* 컨테이너 & 카드: 다크 옵시디언 네온 글래스 */
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(13, 19, 38, 0.84) !important;
-            backdrop-filter: blur(20px) !important;
-            border: 1px solid rgba(0, 245, 212, 0.28) !important;
-            border-radius: 22px !important;
-            box-shadow: 0 14px 36px -10px rgba(0, 245, 212, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-            padding: clamp(14px, 1.4vw, 20px) !important;
-            transition: all 0.22s ease !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            border-color: rgba(0, 245, 212, 0.55) !important;
-            box-shadow: 0 18px 42px -10px rgba(168, 85, 247, 0.25), 0 0 18px rgba(0, 245, 212, 0.16) !important;
-        }
-        details[data-testid="stExpander"],
-        div[data-testid="stStatusWidget"] {
-            background: rgba(15, 23, 42, 0.90) !important;
-            border: 1px solid rgba(0, 245, 212, 0.28) !important;
-            border-radius: 16px !important;
-        }
-
-        /* 📐 반응형 버튼 & 다운로드 버튼: 사이버 네온 캡슐 (내부 텍스트 대비 강제) */
-        .stButton > button,
-        .stDownloadButton > button {
-            width: 100%;
-            min-height: 42px !important;
-            border-radius: 14px !important;
-            font-weight: 700 !important;
-            font-size: clamp(11.8px, 0.82vw, 13.5px) !important;
-            line-height: 1.3 !important;
-            padding: clamp(6px, 0.55vw, 10px) clamp(10px, 0.9vw, 16px) !important;
-            word-break: keep-all !important;
-            white-space: normal !important;
-            border: 1.5px solid rgba(0, 245, 212, 0.42) !important;
-            background: #0F172A !important;
-            background-color: #0F172A !important;
-            color: #00F5D4 !important;
-            box-shadow: 0 4px 14px rgba(0, 245, 212, 0.10) !important;
-            transition: all 0.2s ease !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            text-align: center !important;
-        }
-        .stButton > button:not([kind="primary"]) *,
-        .stButton > button[kind="secondary"] *,
-        .stDownloadButton > button * {
-            color: #00F5D4 !important;
-            font-weight: 700 !important;
-        }
-        .stButton > button:not([kind="primary"]):hover,
-        .stDownloadButton > button:hover {
-            background: rgba(0, 245, 212, 0.20) !important;
-            background-color: rgba(0, 245, 212, 0.20) !important;
-            border-color: #00F5D4 !important;
-            color: #FFFFFF !important;
-            transform: translateY(-1.5px) !important;
-            box-shadow: 0 0 20px rgba(0, 245, 212, 0.35) !important;
-        }
-        .stButton > button:not([kind="primary"]):hover *,
-        .stDownloadButton > button:hover * {
-            color: #FFFFFF !important;
-        }
-        /* 프라이머리 버튼: 네온 그라데이션 + 딥 어비설 네이비(#040711) 텍스트 강제 */
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #00F5D4 0%, #38BDF8 50%, #A855F7 100%) !important;
-            color: #040711 !important;
-            font-weight: 800 !important;
-            border: none !important;
-            box-shadow: 0 8px 26px -4px rgba(0, 245, 212, 0.50) !important;
-        }
-        .stButton > button[kind="primary"] *,
-        .stButton > button[kind="primary"] p,
-        .stButton > button[kind="primary"] span {
-            color: #040711 !important;
-            font-weight: 800 !important;
-        }
-        .stButton > button[kind="primary"]:hover {
-            color: #040711 !important;
-            box-shadow: 0 0 30px rgba(0, 245, 212, 0.75), 0 0 40px rgba(168, 85, 247, 0.45) !important;
-        }
-
-        div[data-baseweb="tab-list"] {
-            gap: clamp(4px, 0.6vw, 10px) !important;
-            flex-wrap: wrap !important;
-        }
-        button[data-baseweb="tab"] {
-            font-weight: 700 !important;
-            font-size: clamp(12.5px, 0.9vw, 14.5px) !important;
-            color: #94A3B8 !important;
-            padding: 10px clamp(12px, 1.2vw, 20px) !important;
-            white-space: nowrap !important;
-        }
-        button[data-baseweb="tab"] * {
-            color: #94A3B8 !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"],
-        button[data-baseweb="tab"][aria-selected="true"] * {
-            color: #00F5D4 !important;
-            font-weight: 800 !important;
-        }
-
-        div[data-testid="stChatMessage"] {
-            background: rgba(15, 23, 42, 0.86) !important;
-            border: 1px solid rgba(56, 189, 248, 0.25) !important;
-            border-radius: 18px !important;
-            padding: 12px 16px !important;
-            margin-bottom: 10px !important;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
-        }
-
-        @media (max-width: 1200px) {
-            div[data-testid="stHorizontalBlock"] {
-                flex-wrap: wrap !important;
-                gap: 8px !important;
-            }
-            div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
-            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-                min-width: calc(50% - 8px) !important;
-                flex: 1 1 calc(50% - 8px) !important;
-            }
-        }
-        @media (max-width: 680px) {
-            div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
-            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-                min-width: 100% !important;
-                flex: 1 1 100% !important;
-            }
-        }
-
-        /* 물결표(~) 범위 표기 시 GFM strikethrough 오작동으로 인한 텍스트 가로줄(----) 완전 무효화 */
-        del, s, strike {
-            text-decoration: none !important;
-            color: inherit !important;
-            background: transparent !important;
-        }
-
-        /* 히어로 배너 (사이버 네온) */
-        .hero-shell {
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(135deg, rgba(13, 19, 38, 0.88) 0%, rgba(24, 16, 48, 0.84) 100%);
-            backdrop-filter: blur(24px);
-            border: 1px solid rgba(0, 245, 212, 0.40);
-            border-radius: 26px;
-            padding: 26px 30px;
-            margin-bottom: 18px;
-            box-shadow: 0 0 38px -6px rgba(0, 245, 212, 0.22), 0 0 60px -15px rgba(168, 85, 247, 0.28);
-        }
-        .vibe-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: linear-gradient(135deg, #00F5D4, #A855F7);
-            color: #040711;
-            padding: 5px 14px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.05em;
-            box-shadow: 0 0 16px rgba(0, 245, 212, 0.55);
-        }
-        .hero-title {
-            font-size: 28px;
-            font-weight: 800;
-            color: #FFFFFF;
-            margin: 10px 0 6px 0;
-            letter-spacing: -0.02em;
-            text-shadow: 0 0 18px rgba(0, 245, 212, 0.35);
-        }
-        .hero-desc {
-            font-size: 14px;
-            color: #CBD5E1;
-            margin: 0 0 14px 0;
-            line-height: 1.55;
-        }
-        .hero-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .hero-tag {
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid rgba(0, 245, 212, 0.38);
-            color: #00F5D4;
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            box-shadow: 0 0 10px rgba(0, 245, 212, 0.12);
-        }
-
-        /* 일정 타임라인 카드 (사이버 네온) */
-        .timeline-card {
-            background: rgba(15, 23, 42, 0.86);
-            border: 1px solid rgba(0, 245, 212, 0.25);
-            border-left: 4px solid #00F5D4;
-            border-radius: 18px;
-            padding: 16px 18px;
-            margin-bottom: 12px;
-            box-shadow: 0 8px 26px -6px rgba(0, 0, 0, 0.45);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .timeline-card:hover {
-            transform: translateY(-2px);
-            border-color: #00F5D4;
-            box-shadow: 0 0 24px rgba(0, 245, 212, 0.22);
-        }
-        .timeline-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .timeline-place {
-            font-size: 16px;
-            font-weight: 800;
-            color: #F8FAFC;
-        }
-        .timeline-time {
-            background: rgba(0, 245, 212, 0.14);
-            color: #00F5D4;
-            border: 1px solid rgba(0, 245, 212, 0.4);
-            padding: 3px 10px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .timeline-body {
-            font-size: 13.5px;
-            color: #CBD5E1;
-            line-height: 1.55;
-            margin-bottom: 8px;
-        }
-        .timeline-tip {
-            background: rgba(168, 85, 247, 0.14);
-            border: 1px solid rgba(168, 85, 247, 0.32);
-            border-radius: 10px;
-            padding: 7px 11px;
-            font-size: 12px;
-            color: #E9D5FF;
-            margin-bottom: 10px;
-        }
-
-        .metric-pill {
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid rgba(0, 245, 212, 0.30);
-            border-radius: 16px;
-            padding: 12px 14px;
-            text-align: center;
-            box-shadow: 0 0 18px rgba(0, 245, 212, 0.10);
-        }
-        .metric-label { font-size: 11px; color: #94A3B8; font-weight: 600; }
-        .metric-val { font-size: 14px; font-weight: 800; color: #00F5D4; margin-top: 2px; }
-
-        .booking-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: rgba(15, 23, 42, 0.9);
-            color: #00F5D4 !important;
-            border: 1px solid rgba(0, 245, 212, 0.42);
-            padding: 5px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            text-decoration: none !important;
-            margin-right: 6px;
-            margin-bottom: 6px;
-            box-shadow: 0 0 10px rgba(0, 245, 212, 0.12);
-            transition: all 0.18s ease;
-        }
-        .booking-chip:hover {
-            background: linear-gradient(135deg, #00F5D4, #A855F7);
-            color: #040711 !important;
-            border-color: transparent;
-            transform: translateY(-1px);
-            box-shadow: 0 0 18px rgba(0, 245, 212, 0.55);
-        }
-
-        /* ⚡ 배경 3D 사이버 네온 그리드 & 홀로그램 에너지 파도 레이어 */
-        .ambient-stage {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-        .cyber-glow-cyan {
-            position: absolute;
-            top: 8%;
-            right: 8%;
-            width: 480px;
-            height: 480px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(0, 245, 212, 0.16) 0%, transparent 70%);
-            filter: blur(25px);
-            animation: pulseCyber 10s ease-in-out infinite alternate;
-        }
-        .cyber-glow-violet {
-            position: absolute;
-            bottom: 18%;
-            left: 6%;
-            width: 540px;
-            height: 540px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, rgba(236, 72, 153, 0.08) 45%, transparent 72%);
-            filter: blur(28px);
-            animation: pulseCyber 14s ease-in-out infinite alternate-reverse;
-        }
-        .cyber-grid-floor {
-            position: absolute;
-            bottom: -35%;
-            left: -25%;
-            width: 150%;
-            height: 70%;
-            background-image:
-                linear-gradient(to right, rgba(0, 245, 212, 0.18) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(168, 85, 247, 0.22) 1px, transparent 1px);
-            background-size: 56px 56px;
-            transform: perspective(520px) rotateX(68deg);
-            mask-image: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-            animation: cyberGridMove 6s linear infinite;
-        }
-        .wave-dock {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 190px;
-            overflow: hidden;
-            line-height: 0;
-        }
-        .wave-track {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 200%;
-            height: 100%;
-            display: flex;
-        }
-        .wave-track svg {
-            width: 50%;
-            height: 100%;
-        }
-        .cyber-wave-1 {
-            animation: waveRoll 16s linear infinite;
-            filter: drop-shadow(0 0 12px rgba(0, 245, 212, 0.45));
-        }
-        .cyber-wave-2 {
-            animation: waveRollReverse 22s linear infinite;
-            filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.45));
-        }
-        @keyframes cyberGridMove {
-            0% { background-position: 0 0; }
-            100% { background-position: 0 56px; }
-        }
-        @keyframes waveRoll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-        @keyframes waveRollReverse {
-            0% { transform: translateX(-50%); }
-            100% { transform: translateX(0); }
-        }
-        @keyframes pulseCyber {
-            0% { transform: scale(1) translate(0, 0); opacity: 0.75; }
-            100% { transform: scale(1.15) translate(20px, -18px); opacity: 1; }
-        }
-        </style>
-
-        <div class="ambient-stage">
-            <div class="cyber-glow-cyan"></div>
-            <div class="cyber-glow-violet"></div>
-            <div class="cyber-grid-floor"></div>
-            <div class="wave-dock">
-                <div class="wave-track cyber-wave-1">
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(0, 245, 212, 0.10)" d="M0,208L80,197.3C160,187,320,165,480,176C640,187,800,229,960,229.3C1120,229,1280,187,1360,165.3L1440,144L1440,320L0,320Z"></path>
-                        <path fill="none" stroke="rgba(0, 245, 212, 0.55)" stroke-width="2" d="M0,208L80,197.3C160,187,320,165,480,176C640,187,800,229,960,229.3C1120,229,1280,187,1360,165.3L1440,144"></path>
-                    </svg>
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(0, 245, 212, 0.10)" d="M0,208L80,197.3C160,187,320,165,480,176C640,187,800,229,960,229.3C1120,229,1280,187,1360,165.3L1440,144L1440,320L0,320Z"></path>
-                        <path fill="none" stroke="rgba(0, 245, 212, 0.55)" stroke-width="2" d="M0,208L80,197.3C160,187,320,165,480,176C640,187,800,229,960,229.3C1120,229,1280,187,1360,165.3L1440,144"></path>
-                    </svg>
-                </div>
-                <div class="wave-track cyber-wave-2">
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(168, 85, 247, 0.12)" d="M0,240L60,229.3C120,219,240,197,360,197.3C480,197,600,219,720,234.7C840,251,960,261,1080,250.7C1200,240,1320,208,1380,192L1440,176L1440,320L0,320Z"></path>
-                        <path fill="none" stroke="rgba(236, 72, 153, 0.50)" stroke-width="2" d="M0,240L60,229.3C120,219,240,197,360,197.3C480,197,600,219,720,234.7C840,251,960,261,1080,250.7C1200,240,1320,208,1380,192L1440,176"></path>
-                    </svg>
-                    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
-                        <path fill="rgba(168, 85, 247, 0.12)" d="M0,240L60,229.3C120,219,240,197,360,197.3C480,197,600,219,720,234.7C840,251,960,261,1080,250.7C1200,240,1320,208,1380,192L1440,176L1440,320L0,320Z"></path>
-                        <path fill="none" stroke="rgba(236, 72, 153, 0.50)" stroke-width="2" d="M0,240L60,229.3C120,219,240,197,360,197.3C480,197,600,219,720,234.7C840,251,960,261,1080,250.7C1200,240,1320,208,1380,192L1440,176"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-        """
+    <div class="ambient-stage">
+        <div class="leaf-drift leaf-1">🍃</div>
+        <div class="leaf-drift leaf-2">🌿</div>
+        <div class="leaf-drift leaf-3">🍃</div>
+        <div class="leaf-drift leaf-4">🌿</div>
+    </div>
+    """
     st.markdown(css_and_bg, unsafe_allow_html=True)
 
 
-@st.cache_data
+
 def load_travel_metadata() -> list[dict]:
     json_path = os.path.join(BASE_DIR, "data", "travel_metadata.json")
     if not os.path.exists(json_path):
@@ -2076,7 +621,7 @@ def render_gdm_style_route_map_html(
     center_lng = structured_plan.get("center_lng") or 139.6503
 
     if vibe_mode == "cyber":
-        day_palette = {1: "#00F5D4", 2: "#38BDF8", 3: "#E879F9"}
+        palette_list = ["#00F5D4", "#38BDF8", "#E879F9", "#F43F5E", "#A855F7", "#06B6D4", "#F59E0B"]
         card_bg = "rgba(13, 19, 38, 0.90)"
         card_border = "rgba(0, 245, 212, 0.35)"
         title_color = "#F8FAFC"
@@ -2089,7 +634,7 @@ def render_gdm_style_route_map_html(
         chip_border = "rgba(56, 189, 248, 0.35)"
         pin_text_color = "#040711"
     elif vibe_mode == "winter":
-        day_palette = {1: "#38BDF8", 2: "#818CF8", 3: "#C084FC"}
+        palette_list = ["#38BDF8", "#818CF8", "#C084FC", "#0284C7", "#6366F1", "#A855F7", "#38BDF8"]
         card_bg = "rgba(10, 25, 47, 0.92)"
         card_border = "rgba(56, 189, 248, 0.4)"
         title_color = "#F0F9FF"
@@ -2102,7 +647,7 @@ def render_gdm_style_route_map_html(
         chip_border = "rgba(56, 189, 248, 0.35)"
         pin_text_color = "#0B1528"
     elif vibe_mode == "heritage":
-        day_palette = {1: "#D97706", 2: "#DC2626", 3: "#B45309"}
+        palette_list = ["#D97706", "#DC2626", "#B45309", "#92400E", "#B91C1C", "#D97706", "#78350F"]
         card_bg = "rgba(255, 253, 248, 0.96)"
         card_border = "rgba(217, 119, 6, 0.3)"
         title_color = "#451A03"
@@ -2115,7 +660,7 @@ def render_gdm_style_route_map_html(
         chip_border = "#FCD34D"
         pin_text_color = "#FFFFFF"
     else:
-        day_palette = {1: "#10B981", 2: "#0EA5E9", 3: "#8B5CF6"}
+        palette_list = ["#10B981", "#0EA5E9", "#8B5CF6", "#F59E0B", "#EC4899", "#14B8A6", "#6366F1", "#10B981"]
         card_bg = "rgba(255, 255, 255, 0.94)"
         card_border = "rgba(16, 185, 129, 0.25)"
         title_color = "#064E3B"
@@ -2128,6 +673,9 @@ def render_gdm_style_route_map_html(
         chip_border = "#CBD5E1"
         pin_text_color = "#FFFFFF"
 
+    def get_vibe_day_color(d_i: int) -> str:
+        return palette_list[(max(1, d_i) - 1) % len(palette_list)]
+
     seen_coords = []
     stops_data = []
     polylines_data = []
@@ -2136,7 +684,7 @@ def render_gdm_style_route_map_html(
         d_num = int(d_obj.get("day", 1))
         if selected_day not in (0, d_num):
             continue
-        color = day_palette.get(d_num, "#10B981")
+        color = get_vibe_day_color(d_num)
         day_coords = []
         for idx, stop in enumerate(d_obj.get("schedule", []), start=1):
             lat = stop.get("lat")
@@ -2177,7 +725,7 @@ def render_gdm_style_route_map_html(
             polylines_data.append({"coords": day_coords, "color": color})
 
     route_dir_url = structured_plan.get("all_google_dir_url") or make_google_maps_url(dest_name)
-    if selected_day in (1, 2, 3):
+    if selected_day != 0:
         matching = [d for d in days if int(d.get("day", 0)) == selected_day]
         if matching and matching[0].get("google_dir_url"):
             route_dir_url = matching[0]["google_dir_url"]
@@ -2375,6 +923,71 @@ def render_gdm_style_route_map_html(
     components.html(html_code, height=490)
 
 
+@st.fragment(run_every="1.5s")
+def render_background_task_monitor(trip_id: str, dest_name: str, duration_label: str):
+    """백그라운드에서 병렬 실행 중인 AI 추론을 1.5초 주기로 모니터링하고 완료 시 즉시 화면에 커밋"""
+    completed_list = get_any_completed_tasks_for_trip(trip_id)
+    if completed_list:
+        for t in completed_list:
+            if t["status"] == "completed":
+                if t["task_type"] == "itinerary":
+                    itin_res = t["result"]
+                    st.session_state.itinerary_by_trip[trip_id] = itin_res
+                    st.session_state[f"planner_day_{trip_id}"] = 1
+                    if trip_id in st.session_state.messages_by_trip:
+                        st.session_state.messages_by_trip[trip_id].append({
+                            "role": "assistant",
+                            "content": itin_res.get("bot_message", itin_res.get("answer", "")),
+                            "cited_sources": itin_res.get("cited_sources", []),
+                            "all_contexts": itin_res.get("all_contexts", []),
+                            "expanded_queries": itin_res.get("expanded_queries", []),
+                        })
+                    st.toast(f"🎉 '{dest_name}' {t.get('duration_label', '')} 일정이 완성되었습니다!", icon="✨")
+                elif t["task_type"] == "chat":
+                    res_p = t["result"]
+                    if res_p.get("is_itin_update") and res_p.get("itin_res"):
+                        st.session_state.itinerary_by_trip[trip_id] = res_p["itin_res"]
+                    if trip_id in st.session_state.messages_by_trip:
+                        st.session_state.messages_by_trip[trip_id].append({
+                            "role": "assistant",
+                            "content": res_p["answer"],
+                            "cited_sources": res_p.get("cited_sources", []),
+                            "all_contexts": res_p.get("all_contexts", []),
+                            "expanded_queries": res_p.get("expanded_queries", []),
+                        })
+                    st.toast("💬 토리의 맞춤 답변이 도착했습니다!", icon="🐣")
+            elif t["status"] == "error":
+                st.error(f"⚠️ 백그라운드 추론 중 오류: {t.get('error')}")
+        st.rerun()
+        return
+
+    active_task = get_active_task_for_trip(trip_id)
+    if active_task:
+        elapsed = int(time.time() - active_task.get("start_time", time.time()))
+        st.markdown(
+            f"""
+            <div style="background:#F0FDF4;border:2px solid #10B981;border-radius:14px;padding:14px 16px;margin:10px 0;box-shadow:0 4px 14px rgba(16,185,129,0.12);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-weight:800;font-size:13.5px;color:#064E3B;">
+                        🐣 파일럿 토리가 백그라운드에서 병렬 추론 중... ({elapsed}초)
+                    </span>
+                    <span style="background:#064E3B;color:#FFFFFF;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;">
+                        ⚡ 백그라운드 병렬 안전
+                    </span>
+                </div>
+                <div style="font-size:12px;font-weight:600;color:#047857;margin-bottom:6px;">
+                    {active_task.get('step', 'AI 분석 및 동선 계산 중...')}
+                </div>
+                <div style="font-size:11px;color:#065F46;opacity:0.85;line-height:1.45;">
+                    🛡️ <b>자유롭게 화면을 둘러보세요!</b> 다른 탭을 클릭하거나 설정을 변경하셔도 추론이 <b>중단 없이 100% 안전하게 완주</b>됩니다.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.progress(active_task.get("progress", 0.3))
+
+
 def render_interactive_planner_panel(
     trip_id: str,
     selected_trip: dict,
@@ -2385,6 +998,8 @@ def render_interactive_planner_panel(
     user_pref_summary: str,
     vibe_mode: str = "nature",
     panel_key: str = "side",
+    target_days: int = 3,
+    duration_label: str = "2박 3일",
 ) -> None:
     """우측 옆 창: 심플하고 감각적인 맞춤 일정 대시보드"""
     dest_name = selected_trip["name"]
@@ -2411,54 +1026,55 @@ def render_interactive_planner_panel(
         unsafe_allow_html=True,
     )
 
+    active_bg_task = get_active_task_for_trip(trip_id)
+    btn_disabled = (active_bg_task is not None)
+    btn_label = f"⏳ '{dest_name}' {duration_label} 백그라운드 추론 중..." if btn_disabled else f"✨ 내 취향 반영 '{dest_name}' {duration_label} 일정표 & 동선 지도 생성"
+
     if st.button(
-        f"✨ 내 취향 반영 '{dest_name}' 2박 3일 일정표 & 동선 지도 생성",
+        btn_label,
         key=f"gen_itin_btn_{panel_key}",
         type="primary",
         use_container_width=True,
+        disabled=btn_disabled,
     ):
-        with st.status(f"🐣 파일럿 토리가 '{dest_name}' 맞춤 코스와 최적 동선을 설계하고 있어요...", expanded=True) as status:
-            st.write(f"1️⃣ `{dest_name}` 위키백과 명소·기후·역사 자료 확인 중...")
-            collect_info = ensure_wiki_indexed(
-                trip_id=trip_id,
-                dest_name=dest_name,
-                question=f"{dest_name} 관광 명소 랜드마크 역사 문화 음식 여행 코스 {user_pref_summary}",
-                country=country,
-                theme=selected_trip["theme"],
-                force_recollect=force_recollect,
-                chunk_size=chunk_size_val,
-                chunk_overlap=chunk_overlap_val,
-            )
-            if collect_info["cached"]:
-                st.caption(f"✓ 이미 수집된 위키 문서 {len(collect_info['selected_titles'])}건 활용")
-            else:
-                st.caption(f"✓ 위키 문서 {len(collect_info['selected_titles'])}건 수집 및 색인 완료")
-
-            st.write("2️⃣ 다단계 RAG (1차 기본·메타 검색 ➔ 2차 랜드마크·미식·근교 MMR 심층 재검색) 및 동선 설계 중...")
-            itin_res = generate_itinerary(
-                trip_id=trip_id,
-                dest_name=dest_name,
-                country=country,
-                user_preference=user_pref_summary,
-                current_plan=st.session_state.itinerary_by_trip.get(trip_id, {}).get("structured_plan"),
-                top_k=max(4, top_k_val),
-            )
-            st.session_state.itinerary_by_trip[trip_id] = itin_res
-            st.session_state[day_state_key] = 1
-
-            if trip_id in st.session_state.messages_by_trip:
-                st.session_state.messages_by_trip[trip_id].append({
-                    "role": "assistant",
-                    "content": itin_res.get("bot_message", itin_res["answer"]),
-                    "cited_sources": itin_res.get("cited_sources", []),
-                    "all_contexts": itin_res.get("all_contexts", []),
-                    "expanded_queries": itin_res.get("expanded_queries", []),
-                })
-
-            status.update(label=f"✨ '{dest_name}' 맞춤 2박 3일 일정표 & 동선 지도 완성!", state="complete", expanded=False)
+        submit_itinerary_task(
+            trip_id=trip_id,
+            dest_name=dest_name,
+            country=country,
+            theme=selected_trip.get("theme", ""),
+            user_pref_summary=user_pref_summary,
+            current_plan=st.session_state.itinerary_by_trip.get(trip_id, {}).get("structured_plan"),
+            top_k_val=top_k_val,
+            chunk_size_val=chunk_size_val,
+            chunk_overlap_val=chunk_overlap_val,
+            force_recollect=force_recollect,
+            target_days=target_days,
+            duration_label=duration_label,
+        )
+        st.toast(f"🚀 파일럿 토리가 '{dest_name}' {duration_label} 일정 설계를 백그라운드에서 시작했습니다!", icon="🐣")
         st.rerun()
 
+    # 백그라운드 추론 상태 실시간 모니터링 (다른 탭으로 이동하거나 클릭해도 중단되지 않음)
+    render_background_task_monitor(trip_id, dest_name, duration_label)
+
     if trip_id not in st.session_state.itinerary_by_trip:
+        if active_bg_task:
+            with st.container(border=True):
+                st.markdown(
+                    f"""
+                    <div style="text-align:center;padding:32px 16px;">
+                        <div style="font-size:40px;margin-bottom:8px;">🐣✈️</div>
+                        <h4 style="margin:6px 0 6px 0;font-weight:800;color:#064E3B;">'{dest_name}' {duration_label} 일정을 열심히 설계하고 있어요!</h4>
+                        <p style="font-size:13px;color:#047857;line-height:1.6;margin:0;">
+                            백그라운드에서 위키백과를 분석하고 최적 동선을 계산 중입니다.<br/>
+                            다른 탭이나 관광 정보를 둘러보셔도 안전하게 완료됩니다.
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            return
+
         with st.container(border=True):
             empty_icon = "🌿🌊" if vibe_mode == "nature" else "⚡🌃"
             st.markdown(
@@ -2468,7 +1084,7 @@ def render_interactive_planner_panel(
                     <h4 style="margin:6px 0 6px 0;font-weight:800;">나만의 {dest_name} 여행 코스를 그려볼까요?</h4>
                     <p style="font-size:13px;opacity:0.8;line-height:1.6;margin:0;">
                         왼쪽에서 <b>파일럿 토리 🐣</b>에게 취향을 말해주거나,<br/>
-                        위의 <b>'2박 3일 일정표 & 동선 지도 생성'</b> 버튼을 눌러보세요!
+                        위의 <b>'일정표 & 동선 지도 생성'</b> 버튼을 눌러보세요!
                     </p>
                 </div>
                 """,
@@ -2517,7 +1133,7 @@ def render_interactive_planner_panel(
                 st.download_button(
                     label="📄 일정표 PDF 저장",
                     data=pdf_bytes,
-                    file_name=f"TripPilot_{dest_name}_2박3일_여행계획표.pdf",
+                    file_name=f"TripPilot_{dest_name}_{duration_label}_여행계획표.pdf",
                     mime="application/pdf",
                     key=f"dl_pdf_{panel_key}_{trip_id}",
                     use_container_width=True,
@@ -2565,15 +1181,29 @@ def render_interactive_planner_panel(
                 use_container_width=True,
             )
 
-        with st.expander("📱 스마트폰 카메라 스캔용 모바일 공유 QR 코드", expanded=False):
-            qr_text = f"TripPilot {dest_name} 2박 3일 여행 가이드: {selected_trip['summary']} (추천 시기: {selected_trip['best_season']})"
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={urllib.parse.quote(qr_text)}"
-            q1, q2 = st.columns([1, 2.5])
+        with st.expander("📱 스마트폰 카메라 스캔용 모바일 일정표 QR 코드", expanded=False):
+            mobile_web_url = publish_itinerary_to_mobile_web(
+                trip_id=trip_id,
+                dest_name=dest_name,
+                country=country,
+                structured_plan=structured_plan,
+            )
+            target_url = mobile_web_url or f"https://www.google.com/maps/search/{urllib.parse.quote(dest_name + ' 여행')}"
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={urllib.parse.quote(target_url)}&color=064E3B&bgcolor=FAF8F5"
+            q1, q2 = st.columns([1, 2.4], gap="medium")
             with q1:
-                st.image(qr_url, caption="스마트폰 카메라로 스캔", width=140)
+                st.image(qr_url, caption="스마트폰 기본 카메라로 스캔", width=150)
             with q2:
-                st.markdown(f"**[{country}] {dest_name} 여행 요약 카드**")
-                st.caption("친구들이나 동행자가 스마트폰 기본 카메라로 비추면 여행지 요약과 추천 일정을 바로 확인할 수 있습니다.")
+                st.markdown(f"#### 📲 [{country}] {dest_name} 모바일 여행 일정표")
+                st.markdown(
+                    f"스마트폰 기본 카메라로 비추면 **2박 3일 맞춤 여행 계획표 웹페이지**가 즉시 열립니다!<br/>"
+                    f"- **포함 내용**: 일차별 세부 시간표, 추천 맛집·명소, 알러지 케어, 토리의 여행 꿀팁<br/>"
+                    f'<div style="margin-top: 10px; margin-bottom: 8px;">'
+                    f'<a class="booking-chip" href="{target_url}" target="_blank" style="font-size: 13px; padding: 6px 14px; background: #064E3B; color: #FFFFFF !important; border: none; font-weight: 700;">🌐 모바일 여행 계획표 바로 열기</a>'
+                    f'</div>'
+                    f'<span style="font-size: 11px; color: #059669; word-break: break-all;">🔗 바로가기 링크: <a href="{target_url}" target="_blank" style="color: #059669;">{target_url}</a></span>',
+                    unsafe_allow_html=True,
+                )
 
     # 🗣️ 현지 식당·기사님께 바로 보여주는 AI 서바이벌 소통 카드
     all_spots_flat = []
@@ -2629,8 +1259,8 @@ def render_interactive_planner_panel(
     m_cols = st.columns(4)
     with m_cols[0]:
         st.markdown(
-            '<div class="metric-pill"><div class="metric-label">여행 일정</div>'
-            '<div class="metric-val">2박 3일</div></div>',
+            f'<div class="metric-pill"><div class="metric-label">여행 일정</div>'
+            f'<div class="metric-val">{duration_label}</div></div>',
             unsafe_allow_html=True,
         )
     with m_cols[1]:
@@ -2654,66 +1284,88 @@ def render_interactive_planner_panel(
 
     st.write("")
 
-    # ── 반응형 일차 전환 바 (화면 크기에 맞춰 찌그러지지 않는 5-탭 + 이전/다음 네비게이션) ──
-    cur_day = st.session_state[day_state_key]
-    tab_cols = st.columns([1.05, 0.95, 0.95, 0.95, 1.15], gap="small")
+    # ── 반응형 일차 전환 바 (1일부터 최대 30일 한달살기까지 유연 지원) ──
+    num_days = len(days_list) or target_days
+    cur_day = st.session_state.get(day_state_key, 1)
 
-    with tab_cols[0]:
-        if st.button(
-            "🌐 전체",
-            key=f"day0_{panel_key}",
-            type="primary" if cur_day == 0 else "secondary",
-            use_container_width=True,
-        ):
-            st.session_state[day_state_key] = 0
-            st.rerun()
-    for d_idx in [1, 2, 3]:
-        with tab_cols[d_idx]:
-            if st.button(
-                f"Day {d_idx}",
-                key=f"day{d_idx}_{panel_key}",
-                type="primary" if cur_day == d_idx else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state[day_state_key] = d_idx
+    def _get_day_label(d_n: int) -> str:
+        if d_n == 0:
+            return "🌐 전체 일정 종합 보기"
+        elif d_n == 999:
+            return "💰 예산 배분 & 추천 숙소"
+        elif 1 <= d_n <= len(days_list):
+            tt = days_list[d_n - 1].get("theme_title", "")
+            return f"📅 Day {d_n} : {tt}" if tt else f"📅 Day {d_n} 동선 & 타임라인"
+        else:
+            return f"📅 Day {d_n}"
+
+    if num_days <= 5:
+        tab_cols = st.columns([1.05] + [0.95] * num_days + [1.15], gap="small")
+        with tab_cols[0]:
+            if st.button("🌐 전체", key=f"day0_{panel_key}", type="primary" if cur_day == 0 else "secondary", use_container_width=True):
+                st.session_state[day_state_key] = 0
                 st.rerun()
-    with tab_cols[4]:
-        if st.button(
-            "💰 예산·숙소",
-            key=f"day4_{panel_key}",
-            type="primary" if cur_day == 4 else "secondary",
-            use_container_width=True,
-        ):
-            st.session_state[day_state_key] = 4
-            st.rerun()
+        for d_idx in range(1, num_days + 1):
+            with tab_cols[d_idx]:
+                if st.button(f"Day {d_idx}", key=f"day{d_idx}_{panel_key}", type="primary" if cur_day == d_idx else "secondary", use_container_width=True):
+                    st.session_state[day_state_key] = d_idx
+                    st.rerun()
+        with tab_cols[-1]:
+            if st.button("💰 예산·숙소", key=f"day_bud_{panel_key}", type="primary" if cur_day == 999 else "secondary", use_container_width=True):
+                st.session_state[day_state_key] = 999
+                st.rerun()
 
-    arrow_cols = st.columns([1, 2.2, 1], gap="small")
+    arrow_cols = st.columns([1.1, 2.5, 1.1], gap="small")
     with arrow_cols[0]:
         if st.button("◀ 이전 일차", key=f"prev_day_{panel_key}", use_container_width=True):
-            st.session_state[day_state_key] = (cur_day - 1) if cur_day > 0 else 4
+            if cur_day == 0:
+                st.session_state[day_state_key] = 999
+            elif cur_day == 1:
+                st.session_state[day_state_key] = 0
+            elif cur_day == 999:
+                st.session_state[day_state_key] = num_days
+            else:
+                st.session_state[day_state_key] = cur_day - 1
             st.rerun()
+
     with arrow_cols[1]:
-        day_label_map = {
-            0: "🌐 전체 일정 요약 보기",
-            1: "📅 Day 1 동선 & 타임라인",
-            2: "📅 Day 2 동선 & 타임라인",
-            3: "📅 Day 3 동선 & 타임라인",
-            4: "💰 예산 배분 & 추천 숙소",
-        }
-        st.markdown(
-            f'<div style="text-align:center;padding-top:8px;font-size:12.5px;font-weight:800;opacity:0.88;">'
-            f'{day_label_map.get(cur_day, "")}</div>',
-            unsafe_allow_html=True,
-        )
+        if num_days > 5:
+            day_opts = [0] + list(range(1, num_days + 1)) + [999]
+            s_idx = day_opts.index(cur_day) if cur_day in day_opts else 1
+            ch_day = st.selectbox(
+                "일차 선택",
+                options=day_opts,
+                index=s_idx,
+                format_func=_get_day_label,
+                key=f"box_sel_day_{panel_key}",
+                label_visibility="collapsed",
+            )
+            if ch_day != cur_day:
+                st.session_state[day_state_key] = ch_day
+                st.rerun()
+        else:
+            st.markdown(
+                f'<div style="text-align:center;padding-top:8px;font-size:12.5px;font-weight:800;opacity:0.88;">'
+                f'{_get_day_label(cur_day)}</div>',
+                unsafe_allow_html=True,
+            )
+
     with arrow_cols[2]:
         if st.button("다음 일차 ▶", key=f"next_day_{panel_key}", use_container_width=True):
-            st.session_state[day_state_key] = (cur_day + 1) if cur_day < 4 else 0
+            if cur_day == 999:
+                st.session_state[day_state_key] = 0
+            elif cur_day == num_days:
+                st.session_state[day_state_key] = 999
+            elif cur_day == 0:
+                st.session_state[day_state_key] = 1
+            else:
+                st.session_state[day_state_key] = cur_day + 1
             st.rerun()
 
     active_day = st.session_state[day_state_key]
 
-    # 1) 테마 연동 인터랙티브 동선 지도 렌더링
-    if days_list and active_day in (0, 1, 2, 3):
+    # 1) 테마 연동 인터랙티브 동선 지도 렌더링 (선택 일차만 표시하여 동선 뭉침 방지!)
+    if days_list and (active_day == 0 or 1 <= active_day <= num_days):
         render_gdm_style_route_map_html(
             structured_plan,
             selected_day=active_day,
@@ -2725,7 +1377,7 @@ def render_interactive_planner_panel(
     if active_day == 0:
         with st.container(border=True):
             st.markdown(itin_data["answer"])
-    elif active_day in (1, 2, 3):
+    elif 1 <= active_day <= num_days:
         matching_days = [d for d in days_list if int(d.get("day", 0)) == active_day]
         if matching_days:
             d_obj = matching_days[0]
@@ -2836,7 +1488,7 @@ def render_interactive_planner_panel(
                     )
                     st.toast(f"Day {active_day} 일정이 수정되어 동선 지도와 PDF/HTML 가이드북에 반영되었습니다!", icon="✅")
                     st.rerun()
-    elif active_day == 4:
+    else:
         st.markdown(f"#### 💰 {dest_name} 예산 배분 포트폴리오 & 추천 숙소")
         st.caption(f"기준 예산 수준: **{selected_trip['budget_level']}**")
         breakdown = structured_plan.get("budget_breakdown") or [
@@ -2950,38 +1602,31 @@ if "packing_checklist" not in st.session_state:
         {"item": "우산 / 우비 및 일교차 대비 가벼운 겉옷", "done": False},
     ]
 
+# 0. 백그라운드 병렬 추론 완료 태스크 자동 감지 및 세션 동기화 (화면 이동 중에도 완주 보장)
+sync_completed_background_tasks(st.session_state)
+
 
 def select_destination_callback(target_trip_id: str):
     """조건 탐색 카드에서 여행지 선택 시 사이드바 필터와 선택 상태를 즉시 동기화"""
     st.session_state.selected_trip_id = str(target_trip_id)
     st.session_state.continent_filter = "전체 대륙"
-    st.session_state.theme_filter = "전체 테마"
 
 
 # 4. 사이드바 구성
 with st.sidebar:
     st.markdown("## 🐣 TripPilot")
     st.caption("AI 여행 메이트 토리 & 맞춤 일정 플래너")
+    st.markdown(render_pilot_tori_mascot_html(), unsafe_allow_html=True)
 
     continents = ["전체 대륙"] + sorted(list({item["continent"] for item in travel_list}))
     selected_continent = st.selectbox("🌍 대륙 선택", continents, key="continent_filter")
 
-    all_themes_set = set()
-    for item in travel_list:
-        for t in item["theme"].split("/"):
-            if t.strip():
-                all_themes_set.add(t.strip())
-    theme_options = ["전체 테마"] + sorted(list(all_themes_set))
-    selected_theme = st.selectbox("🏷️ 여행 테마 선택", theme_options, key="theme_filter")
-
     filtered_trips = travel_list
     if selected_continent != "전체 대륙":
         filtered_trips = [item for item in filtered_trips if item["continent"] == selected_continent]
-    if selected_theme != "전체 테마":
-        filtered_trips = [item for item in filtered_trips if selected_theme in item["theme"].split("/")]
 
     if not filtered_trips:
-        st.info("해당 대륙/테마 조합의 여행지가 없어 전체 목록을 표시합니다.")
+        st.info("해당 대륙의 여행지가 없어 전체 목록을 표시합니다.")
         filtered_trips = travel_list
 
     trip_id_to_item = {str(item["id"]): item for item in filtered_trips}
@@ -3002,59 +1647,34 @@ with st.sidebar:
     trip_id = str(selected_trip["id"])
     dest_name = selected_trip["name"]
 
-    # 여행지 성격에 따른 테마 자동 감지 & 수동 전환 옵션
-    auto_vibe = detect_destination_vibe(selected_trip)
-    vibe_choice = st.radio(
-        "🎨 배경 무드 (여행지 성격 자동 연동)",
-        options=["auto", "nature", "heritage", "winter", "cyber"],
-        format_func=lambda v: (
-            f"🔄 여행지 자동 ({'❄️ 윈터 오로라' if auto_vibe == 'winter' else ('🏛️ 헤리티지 선셋' if auto_vibe == 'heritage' else ('⚡ 네온 퓨처' if auto_vibe == 'cyber' else '🌿 네이처 파도'))})"
-            if v == "auto"
-            else {
-                "nature": "🌿 네이처 & 오션 웨이브 (자연/휴양)",
-                "heritage": "🏛️ 클래식 헤리티지 선셋 (역사/유적/예술)",
-                "winter": "❄️ 오로라 & 윈터 스노우 (설경/오로라)",
-                "cyber": "⚡ 사이버 네온 시티 (대도시/야경)",
-            }.get(v, v)
-        ),
-        horizontal=False,
-        key="vibe_override",
-    )
-    active_vibe = auto_vibe if vibe_choice == "auto" else vibe_choice
-
-    with st.expander("🎨 4대 공간 공감 디자인 철학 (Spatial Empathy)", expanded=False):
-        st.markdown(
-            """
-**1. 핵심 디자인 철학: 공간 공감(Spatial Empathy)**
-- 여행 계획은 단순한 텍스트 검색이 아니라 **여행지의 공기·빛·온도를 미리 경험하는 과정**이라는 철학으로 설계되었습니다.
-
-**2. 4대 공간 공감 비주얼 테마 시스템**
-- **🌿 Biophilic Serenity (자연·휴양·해양·섬)**
-  - *영감*: 숲의 피톤치드(`#059669`)와 파도 윤슬(`#F7FDF9`). 3중 SVG 파도 애니메이션으로 시각적 휴식을 제공합니다.
-- **🏛️ Classic Heritage & Sunset Gold (역사·유적·고도·예술 도시: 교토, 로마, 경주 등)**
-  - *영감*: 따뜻한 파피루스 아이보리(`#FAF5EC`)와 황금빛 노을(`#B45309`). 하늘로 피어오르는 골든 더스트 입자 효과.
-- **❄️ Aurora & Winter Wonderland (설경·오로라·빙하: 삿포로, 인터라켄, 레이캬비크 등)**
-  - *영감*: 딥 네이비 밤하늘과 빛나는 오로라 리본 커튼, 화면 가득 흩날리는 **실시간 눈송이(Snowfall)** 애니메이션.
-- **⚡ Neo-Urban Horizon (메가시티·마천루·야경: 도쿄, 뉴욕, 싱가포르 등)**
-  - *영감*: 야간 비행 조종석(HUD)과 미래 도시 스카이라인. 다크 옵시디언 글래스 & 네온 시안/바이올렛 3D 그리드.
-            """
-        )
+    active_vibe = "nature"
 
     wiki_cache = load_wiki_cache()
     trip_cached_info = wiki_cache.get(trip_id, {})
     cached_titles = trip_cached_info.get("titles", [])
     sidebar_links = make_booking_links(dest_name, selected_trip["country"])
 
+    selected_visuals = get_destination_visuals(selected_trip)
     st.markdown("#### 🗺️ 선택 여행지 요약")
     with st.container(border=True):
         st.markdown(
-            f"""
+            f'''
+            <div style="border-radius: 14px; overflow: hidden; margin-bottom: 12px; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,0.12);">
+                <img src="{selected_visuals['thumb_url']}" style="width: 100%; height: 110px; object-fit: cover; display: block;" />
+                <span style="position: absolute; bottom: 6px; right: 8px; background: rgba(6,78,59,0.9); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; backdrop-filter: blur(4px);">🌿 자연 친화도 {selected_visuals['nature_score']}%</span>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'''
 **{selected_trip['name']}** (`{selected_trip['country']}` · {selected_trip['continent']})
 - **테마**: `{selected_trip['theme']}`
+- **자연 쉼터**: `{selected_visuals['nature_level']}`
 - **예산**: `{selected_trip['budget_level']}`
 - **추천 시기**: `{selected_trip['best_season']}`
 - **소개**: {selected_trip['summary']}
-            """
+            '''
         )
         st.markdown(
             f'<a class="booking-chip" href="{sidebar_links["google_maps"]}" target="_blank">📍 구글 지도</a>'
@@ -3092,35 +1712,73 @@ with st.sidebar:
     st.warning(DISCLAIMER_TEXT)
     st.caption("문서 출처: 한국어 위키백과 (CC BY-SA 4.0)")
 
-# 선택된 무드(4대 공간 공감 테마) CSS 및 배경 애니메이션 주입
+# 선택된 무드(밝은 오트밀 & 포레스트 그린) CSS 및 배경 애니메이션 주입
 inject_theme_css_and_background(active_vibe, dest_name)
 
-# 5. 메인 상단 미니멀 히어로 배너
-if active_vibe == "winter":
-    vibe_badge_text = "❄️ AURORA & WINTER WONDERLAND · 눈부신 설경과 신비로운 오로라 무드"
-elif active_vibe == "heritage":
-    vibe_badge_text = "🏛️ CLASSIC HERITAGE & SUNSET GOLD · 천년의 역사와 노을빛이 깃든 앤티크 무드"
-elif active_vibe == "cyber":
-    vibe_badge_text = "⚡ CYBER NEON METROPOLIS · 미래지향적 네온 시티 무드"
-else:
-    vibe_badge_text = "🌿 NATURE & OCEAN WAVE · 자연과 파도가 어우러진 힐링 무드"
+# 🐥 하늘을 날아다니는 3D 파일럿 토리 오버레이 (클릭 시 하단 여행 라운지로 스크롤 이동)
+st.markdown(render_flying_tori_overlay_html(dest_name), unsafe_allow_html=True)
+
+# 💡 첫 방문자를 위한 4-Step 비주얼 튜토리얼 가이드 (초보자 안내)
+with st.expander("🐣 **처음 오셨나요? 4단계로 끝내는 TripPilot 100% 활용 튜토리얼 (클릭하여 열기)**", expanded=True):
+    st.markdown(
+        """
+        <div style="background: #FFFFFF; border: 1.5px solid #10B981; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(6,78,59,0.06); margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #ECFDF5; padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <span style="font-size: 15.5px; font-weight: 800; color: #064E3B;">🧭 TripPilot AI 맞춤 여행 플래너 4단계 마스터 가이드</span>
+                <span style="background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px;">🐣 1분 만에 완성하기</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 1</div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">📍 여행지 선택하기</div>
+                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
+                        <b>왼쪽 사이드바</b>에서 <code>대륙</code>과 <code>도시·랜드마크</code>를 선택하세요.<br/>
+                        <span style="font-size: 11px; color: #059669;">💡 2번째 탭 <b>'맞춤 조건 추천'</b>에서 '온천 휴양지'처럼 조건으로 찾을 수도 있어요!</span>
+                    </div>
+                </div>
+                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 2</div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">✨ 취향 & 알러지 체크</div>
+                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
+                        상단 옵션 바에서 <b>동행자, 여행 취향, 템포, 알러지</b>를 선택하세요.<br/>
+                        <span style="font-size: 11px; color: #059669;">💡 알러지가 없다면 기본값 <b>'해당 없음'</b>을 선택하시면 됩니다.</span>
+                    </div>
+                </div>
+                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 3</div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">🚀 원클릭 맞춤 일정 생성</div>
+                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
+                        우측의 <b>'내 취향 반영 2박 3일 맞춤 일정표 생성'</b> 초록색 버튼을 클릭하세요.<br/>
+                        <span style="font-size: 11px; color: #059669;">💡 AI 토리가 위키 기반 고증 명소와 최단 동선 지도를 완성합니다!</span>
+                    </div>
+                </div>
+                <div style="background: #FAF8F5; border: 1.5px solid #E5E0D5; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; font-weight: 800; color: #059669; margin-bottom: 3px;">STEP 4</div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0F291E; margin-bottom: 5px;">💬 실시간 조율 & 공유</div>
+                    <div style="font-size: 12px; color: #375346; line-height: 1.55;">
+                        하단 <b>파일럿 토리 라운지</b>에서 <i>'비 올 때 실내 코스로 바꿔줘'</i>라고 말하면 일정이 즉시 바뀝니다!<br/>
+                        <span style="font-size: 11px; color: #059669;">💡 <b>PDF 저장</b> 또는 <b>스마트폰 QR 코드</b>로 친구들에게 바로 공유하세요.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# 5. 현실감 넘치는 고해상도 실사 자연 히어로 배너 & 갤러리
+vibe_badge_text = "🌿 WARM OATMEAL & BIOPHILIC FOREST · 자연과 쉼이 어우러진 감성 여행 가이드"
 
 st.markdown(
-    f"""
-    <div class="hero-shell">
-        <span class="vibe-badge">{vibe_badge_text}</span>
-        <div class="hero-title">[{selected_trip['country']}] {dest_name}</div>
-        <p class="hero-desc">{selected_trip['summary']}</p>
-        <div class="hero-tags">
-            <span class="hero-tag">🗓️ 추천 시기 · {selected_trip['best_season']}</span>
-            <span class="hero-tag">💰 예상 경비 · {selected_trip['budget_level']}</span>
-            <span class="hero-tag">🧭 테마 · {selected_trip['theme']}</span>
-            <span class="hero-tag">🐣 파일럿 토리 실시간 코파일럿</span>
-        </div>
-    </div>
-    """,
+    render_nature_hero_html(selected_trip, selected_visuals, vibe_badge_text),
     unsafe_allow_html=True,
 )
+
+with st.expander(f"📸 {dest_name} 실사 힐링 명소 & 자연 뷰파인더 갤러리 열기 (자연 친화도 {selected_visuals['nature_score']}%)", expanded=True):
+    st.markdown(
+        render_nature_gallery_html(selected_visuals, dest_name, vibe_mode=active_vibe),
+        unsafe_allow_html=True,
+    )
 
 tab_main, tab_explore, tab_compare, tab_friends, tab_factcheck = st.tabs([
     "🐣 토리랑 취향 채팅 & 맞춤 일정·동선 지도",
@@ -3134,14 +1792,62 @@ tab_main, tab_explore, tab_compare, tab_friends, tab_factcheck = st.tabs([
 with tab_main:
     # 취향 & 알러지 & 출발 월 선택 바
     with st.container(border=True):
-        pref_c1, pref_c2, pref_c3, pref_c4, pref_c5 = st.columns([1.0, 1.6, 0.95, 1.25, 0.8])
-        with pref_c1:
+        p_row1_c1, p_row1_c2, p_row1_c3 = st.columns([1.1, 1.4, 0.85], gap="medium")
+        with p_row1_c1:
             companion_choice = st.selectbox(
                 "👥 누구와 함께 가나요?",
                 ["👫 친구들과 우정 여행", "💑 연인과 로맨틱 여행", "👨‍👩‍👧 가족/부모님과 편한 여행", "🎒 혼자 떠나는 자유 여행"],
                 key=f"comp_{trip_id}",
             )
-        with pref_c2:
+        with p_row1_c2:
+            duration_preset = st.selectbox(
+                "🗓️ 여행 기간 설정 (최대 한달살기)",
+                [
+                    "2박 3일 (인기 추천)",
+                    "당일치기 (1일)",
+                    "1박 2일",
+                    "3박 4일",
+                    "4박 5일",
+                    "5박 6일",
+                    "6박 7일 (1주일)",
+                    "9박 10일 (열흘 코스)",
+                    "13박 14일 (2주 살기)",
+                    "20박 21일 (3주 살기)",
+                    "29박 30일 (한달살기)",
+                    "⚙️ 일수 직접 입력 (1~30일)",
+                ],
+                index=0,
+                key=f"dur_preset_{trip_id}",
+            )
+            if duration_preset == "⚙️ 일수 직접 입력 (1~30일)":
+                target_days = st.slider("여행 일수 선택 (최대 30일)", min_value=1, max_value=30, value=3, format="%d일", key=f"dur_slider_{trip_id}")
+            else:
+                dur_preset_map = {
+                    "당일치기 (1일)": 1,
+                    "1박 2일": 2,
+                    "2박 3일 (인기 추천)": 3,
+                    "3박 4일": 4,
+                    "4박 5일": 5,
+                    "5박 6일": 6,
+                    "6박 7일 (1주일)": 7,
+                    "9박 10일 (열흘 코스)": 10,
+                    "13박 14일 (2주 살기)": 14,
+                    "20박 21일 (3주 살기)": 21,
+                    "29박 30일 (한달살기)": 30,
+                }
+                target_days = dur_preset_map.get(duration_preset, 3)
+
+        with p_row1_c3:
+            travel_month_num = st.selectbox(
+                "📅 출발 예정 월",
+                options=list(range(1, 13)),
+                index=10,
+                format_func=lambda m: f"{m}월",
+                key=f"month_sel_{trip_id}",
+            )
+
+        p_row2_c1, p_row2_c2, p_row2_c3 = st.columns([1.6, 0.95, 1.3], gap="medium")
+        with p_row2_c1:
             style_choices = st.multiselect(
                 "✨ 선호하는 여행 취향 (다중 선택)",
                 [
@@ -3157,16 +1863,17 @@ with tab_main:
                 default=["☕ 감성 카페 & 힐링", "🍣 현지 미식 & 로컬 맛집"],
                 key=f"styles_{trip_id}",
             )
-        with pref_c3:
+        with p_row2_c2:
             pace_choice = st.selectbox(
                 "⏰ 일정 템포",
                 ["😌 여유롭게 (힐링)", "👟 알차게 (핵심 정복)", "😴 늦잠 모드 (11시)"],
                 key=f"pace_{trip_id}",
             )
-        with pref_c4:
+        with p_row2_c3:
             dietary_choices = st.multiselect(
                 "🛡️ 알러지·식이제한·배려",
                 [
+                    "✅ 해당 없음 (알러지 없음)",
                     "🚫 생선·해산물 알러지 (육류 대체)",
                     "🚫 갑각류(새우·게) 알러지",
                     "🥜 견과류·땅콩 알러지",
@@ -3174,43 +1881,65 @@ with tab_main:
                     "🥩 돼지고기 제외 (할랄)",
                     "♿ 계단 최소화·택시 이동",
                 ],
-                default=[],
+                default=["✅ 해당 없음 (알러지 없음)"],
                 key=f"diet_{trip_id}",
             )
-        with pref_c5:
-            travel_month_num = st.selectbox(
-                "📅 출발 예정 월",
-                options=list(range(1, 13)),
-                index=10,
-                format_func=lambda m: f"{m}월",
-                key=f"month_sel_{trip_id}",
-            )
+
+    if target_days == 1:
+        duration_label = "당일치기"
+    elif target_days == 30:
+        duration_label = "29박 30일 (한달살기)"
+    elif target_days == 7:
+        duration_label = "6박 7일 (1주일)"
+    elif target_days == 14:
+        duration_label = "13박 14일 (2주 살기)"
+    elif target_days == 21:
+        duration_label = "20박 21일 (3주 살기)"
+    else:
+        duration_label = f"{target_days-1}박 {target_days}일"
 
     chat_constraints_list = st.session_state.chat_constraints_by_trip.get(trip_id, [])
-    all_constraints = list(dietary_choices) + [c for c in chat_constraints_list if c not in dietary_choices]
+    active_dietary = [c for c in dietary_choices if "해당 없음" not in c and "알러지 없음" not in c]
+    all_constraints = list(active_dietary) + [c for c in chat_constraints_list if c not in active_dietary and "해당 없음" not in c and "알러지 없음" not in c]
     constraint_str = f", 필수 배려·식이제한: {', '.join(all_constraints)}" if all_constraints else ""
     user_pref_summary = (
-        f"{companion_choice}, 선호 테마: {', '.join(style_choices) or '힐링/미식'}, "
+        f"{companion_choice}, 기간: {duration_label} (총 {target_days}일), "
+        f"선호 테마: {', '.join(style_choices) or '힐링/미식'}, "
         f"템포: {pace_choice}, 출발 예정: {travel_month_num}월{constraint_str}"
     )
 
     # 💱 실시간 체감 환율 및 현지 물가 지표 바
     currency_info = get_currency_and_cost_info(selected_trip["country"])
+    sample_krw = int(round(currency_info["sample_amt"] * currency_info["krw_rate"], -2))
+    curr_unit = currency_info["currency"].split(" ")[0].strip()
     with st.container(border=True):
-        st.markdown(f"**💱 {dest_name} 실시간 체감 환율 & 현지 물가 시뮬레이터** `(현지 통화: {currency_info['currency']})`")
-        curr_c1, curr_c2, curr_c3, curr_c4 = st.columns(4)
-        sample_krw = int(round(currency_info["sample_amt"] * currency_info["krw_rate"], -2))
-        with curr_c1:
-            st.metric(
-                f"체감 환율 기준 ({currency_info['symbol']})",
-                f"{currency_info['sample_amt']:,} = 약 {sample_krw:,}원",
-            )
-        with curr_c2:
-            st.metric("☕ 스타벅스/카페 커피 1잔", currency_info["coffee"])
-        with curr_c3:
-            st.metric("🍽️ 로컬 식당 식사 1끼", currency_info["meal"])
-        with curr_c4:
-            st.metric("🚕 택시/그랩 기본요금", currency_info["taxi"])
+        st.markdown(
+            f'''
+            <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                <span style="font-size: 15px; font-weight: 800; color: #064E3B;">💱 {dest_name} 실시간 체감 환율 & 현지 물가 시뮬레이터</span>
+                <span style="background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">현지 통화: {currency_info['currency']}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;">
+                <div style="background: #FFFFFF; border: 1.5px solid #D1FAE5; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(6,78,59,0.04);">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #047857; margin-bottom: 4px;">체감 환율 기준 ({curr_unit})</div>
+                    <div style="font-size: 15.5px; font-weight: 800; color: #0F291E; line-height: 1.35; word-break: keep-all;">{currency_info['sample_amt']:,} {curr_unit} = <span style="color:#059669; font-weight:800;">약 {sample_krw:,}원</span></div>
+                </div>
+                <div style="background: #FFFFFF; border: 1.5px solid #D1FAE5; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(6,78,59,0.04);">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #047857; margin-bottom: 4px;">☕ 스타벅스/카페 커피 1잔</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0F291E; line-height: 1.35; word-break: keep-all;">{currency_info['coffee']}</div>
+                </div>
+                <div style="background: #FFFFFF; border: 1.5px solid #D1FAE5; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(6,78,59,0.04);">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #047857; margin-bottom: 4px;">🍽️ 로컬 식당 식사 1끼</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0F291E; line-height: 1.35; word-break: keep-all;">{currency_info['meal']}</div>
+                </div>
+                <div style="background: #FFFFFF; border: 1.5px solid #D1FAE5; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 6px rgba(6,78,59,0.04);">
+                    <div style="font-size: 11.5px; font-weight: 700; color: #047857; margin-bottom: 4px;">🚕 택시/그랩 기본요금</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0F291E; line-height: 1.35; word-break: keep-all;">{currency_info['taxi']}</div>
+                </div>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )
 
     # 📡 다단계 RAG 파이프라인 X-Ray 시각화
     with st.expander("📡 다단계 RAG 파이프라인 X-Ray (1차 메타 검색 ➔ 2차 서브쿼리 확장 ➔ MMR 심층 재검색 ➔ 가드레일)", expanded=False):
@@ -3234,7 +1963,11 @@ graph LR
     col_chat_pane, col_plan_pane = st.columns([1.0, 1.14], gap="large")
 
     with col_chat_pane:
-        st.markdown("#### 🐣 파일럿 토리와의 여행 라운지")
+        st.markdown(
+            '<div id="pilot-tori-lounge" style="scroll-margin-top: 80px;"></div>'
+            '<h4 style="color:#064E3B; font-weight:800; margin:0 0 4px 0;">🐣 파일럿 토리와의 여행 라운지</h4>',
+            unsafe_allow_html=True,
+        )
         st.caption(
             "취향을 말하거나 **'나는 생선 알러지가 있는데 생선 말고 고기 맛집으로 바꿔줘'**, **'2일차 비 올 때 실내 코스로 바꿔줘'**처럼 얘기하면 오른쪽 일정표와 동선 지도가 실시간으로 수정됩니다!"
         )
@@ -3254,11 +1987,11 @@ graph LR
         q_cols = st.columns(2)
         quick_prompt = None
         with q_cols[0]:
-            if st.button("✨ 내 취향대로 2박 3일 코스 짜줘!", use_container_width=True):
-                quick_prompt = f"내 취향({user_pref_summary})에 맞춰서 {dest_name} 2박 3일 여행 일정과 추천 숙소를 짜줘!"
+            if st.button(f"✨ 내 취향대로 {duration_label} 코스 짜줘!", use_container_width=True):
+                quick_prompt = f"내 취향({user_pref_summary})에 맞춰서 {dest_name} {duration_label} 여행 일정과 추천 숙소를 짜줘!"
             if st.button("🚫 생선 알러지! 고기 맛집 코스로 수정", use_container_width=True):
                 quick_prompt = (
-                    f"나는 생선·해산물 알러지가 있어! {dest_name} 2박 3일 일정에서 생선·해산물·초밥·수산시장 코스를 모두 빼고, "
+                    f"나는 생선·해산물 알러지가 있어! {dest_name} {duration_label} 일정에서 생선·해산물·초밥·수산시장 코스를 모두 빼고, "
                     f"육류(스테이크·구이·바비큐)나 알러지 걱정 없는 현지 대표 맛집·디저트 코스로 일정을 실시간 수정해줘!"
                 )
         with q_cols[1]:
@@ -3280,6 +2013,27 @@ graph LR
                             msg.get("expanded_queries"),
                         )
 
+            active_chat_task = get_active_task_for_trip(trip_id)
+            if active_chat_task:
+                with st.chat_message("assistant", avatar="🐣"):
+                    elapsed_chat = int(time.time() - active_chat_task.get("start_time", time.time()))
+                    st.markdown(
+                        f"""
+                        <div style="background:#F0FDF4;border:1.5px solid #10B981;border-radius:12px;padding:10px 14px;margin-bottom:6px;">
+                            <div style="font-weight:700;font-size:13px;color:#064E3B;margin-bottom:4px;">
+                                🐣 파일럿 토리가 백그라운드에서 추론하고 있어요... ({elapsed_chat}초)
+                            </div>
+                            <div style="font-size:12px;color:#047857;">
+                                {active_chat_task.get('step', '데이터 검색 및 답변 생성 중...')}
+                            </div>
+                            <div style="font-size:11px;color:#065F46;opacity:0.85;margin-top:3px;">
+                                💡 다른 화면으로 이동하셔도 백그라운드에서 멈추지 않고 계속 처리됩니다.
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
         typed_question = st.chat_input(
             f"토리에게 '생선 알러지가 있어', '2일차 오후는 카페로 바꿔줘' 등 '{dest_name}' 일정 수정이나 질문을 말해 보세요..."
         )
@@ -3294,7 +2048,6 @@ graph LR
                 dest_name = mentioned_trip["name"]
                 st.session_state.selected_trip_id = trip_id
                 st.session_state.continent_filter = "전체 대륙"
-                st.session_state.theme_filter = "전체 테마"
                 if trip_id not in st.session_state.messages_by_trip or not st.session_state.messages_by_trip[trip_id]:
                     st.session_state.messages_by_trip[trip_id] = [
                         {
@@ -3315,82 +2068,30 @@ graph LR
 
             has_existing_plan = trip_id in st.session_state.itinerary_by_trip
             current_messages.append({"role": "user", "content": active_user_input})
-            with chat_container:
-                with st.chat_message("user", avatar="🧳"):
-                    st.markdown(active_user_input)
+            is_itin = is_itinerary_or_preference_request(active_user_input, has_existing_plan=has_existing_plan)
+            active_constraints_now = st.session_state.chat_constraints_by_trip.get(trip_id, [])
+            active_dietary_now = [c for c in dietary_choices if "해당 없음" not in c and "알러지 없음" not in c]
+            merged_constraints = list(active_dietary_now) + [c for c in active_constraints_now if c not in active_dietary_now and "해당 없음" not in c and "알러지 없음" not in c]
+            constraint_note = f" / 누적 필수 배려사항: {' | '.join(merged_constraints)}" if merged_constraints else ""
+            combined_pref = f"{user_pref_summary}{constraint_note} / 이번 실시간 수정·취향 요청: {active_user_input}"
 
-                with st.chat_message("assistant", avatar="🐣"):
-                    with st.status(f"🐣 파일럿 토리가 '{dest_name}' 다단계(1차·2차) RAG 검색을 수행하고 있어요...", expanded=True) as status:
-                        collect_info = ensure_wiki_indexed(
-                            trip_id=trip_id,
-                            dest_name=dest_name,
-                            question=active_user_input,
-                            country=selected_trip["country"],
-                            theme=selected_trip["theme"],
-                            force_recollect=force_recollect,
-                            chunk_size=chunk_size_val,
-                            chunk_overlap=chunk_overlap_val,
-                        )
-                        if collect_info["cached"]:
-                            st.caption(f"✓ 이미 수집된 위키 문서 {len(collect_info['selected_titles'])}건 활용")
-                        else:
-                            st.caption(f"✓ 위키 문서 {len(collect_info['selected_titles'])}건 수집 완료")
-
-                        expanded_queries = []
-                        if is_itinerary_or_preference_request(active_user_input, has_existing_plan=has_existing_plan):
-                            st.write("🔍 1차 RAG(기본·메타 검색) ➔ 2차 심층 RAG(알러지·취향·대체 코스 MMR 재검색) 후 일정표와 동선 지도를 실시간 업데이트하고 있어요...")
-                            active_constraints_now = st.session_state.chat_constraints_by_trip.get(trip_id, [])
-                            merged_constraints = list(dietary_choices) + [c for c in active_constraints_now if c not in dietary_choices]
-                            constraint_note = f" / 누적 필수 배려사항: {' | '.join(merged_constraints)}" if merged_constraints else ""
-                            combined_pref = f"{user_pref_summary}{constraint_note} / 이번 실시간 수정·취향 요청: {active_user_input}"
-                            itin_res = generate_itinerary(
-                                trip_id=trip_id,
-                                dest_name=dest_name,
-                                country=selected_trip["country"],
-                                user_preference=combined_pref,
-                                current_plan=st.session_state.itinerary_by_trip.get(trip_id, {}).get("structured_plan"),
-                                top_k=max(4, top_k_val),
-                            )
-                            st.session_state.itinerary_by_trip[trip_id] = itin_res
-                            answer = itin_res.get("bot_message", itin_res["answer"])
-                            cited_sources = itin_res.get("cited_sources", [])
-                            all_contexts = itin_res.get("all_contexts", [])
-                            expanded_queries = itin_res.get("expanded_queries", [])
-                            status.update(
-                                label=f"✨ '{dest_name}' 다단계 RAG 기반 맞춤 일정 & 동선 지도 실시간 업데이트 완료! (근거 {len(cited_sources)}건 인용)",
-                                state="complete",
-                                expanded=False,
-                            )
-                        else:
-                            st.write("🔍 1차 RAG(메타데이터·초기 의미 검색) ➔ 2차 심층 RAG(서브쿼리 확장 MMR 재검색) ➔ 답변 생성 중...")
-                            rag_result = query_trip_pilot(
-                                trip_id=trip_id,
-                                dest_name=dest_name,
-                                question=active_user_input,
-                                top_k=top_k_val,
-                                search_type=search_type_label,
-                            )
-                            answer = rag_result["answer"]
-                            cited_sources = rag_result["cited_sources"]
-                            all_contexts = rag_result["all_contexts"]
-                            expanded_queries = rag_result.get("expanded_queries", [])
-                            status.update(
-                                label=f"✓ '{dest_name}' 다단계 RAG 답변 완료! (근거 {len(cited_sources)}건 인용)",
-                                state="complete",
-                                expanded=False,
-                            )
-
-                    st.markdown(answer)
-                    if cited_sources:
-                        render_cited_sources(cited_sources, all_contexts, expanded_queries)
-
-            current_messages.append({
-                "role": "assistant",
-                "content": answer,
-                "cited_sources": cited_sources,
-                "all_contexts": all_contexts,
-                "expanded_queries": expanded_queries,
-            })
+            submit_chat_task(
+                trip_id=trip_id,
+                dest_name=dest_name,
+                country=selected_trip["country"],
+                theme=selected_trip["theme"],
+                active_user_input=active_user_input,
+                user_pref_summary=combined_pref if is_itin else user_pref_summary,
+                current_plan=st.session_state.itinerary_by_trip.get(trip_id, {}).get("structured_plan"),
+                top_k_val=top_k_val,
+                search_type_label=search_type_label,
+                chunk_size_val=chunk_size_val,
+                chunk_overlap_val=chunk_overlap_val,
+                force_recollect=force_recollect,
+                target_days=target_days,
+                duration_label=duration_label,
+                is_itin_request=is_itin,
+            )
             st.rerun()
 
     with col_plan_pane:
@@ -3404,6 +2105,8 @@ graph LR
             user_pref_summary=user_pref_summary,
             vibe_mode=active_vibe,
             panel_key="main_right",
+            target_days=target_days,
+            duration_label=duration_label,
         )
 
 # ── 탭 2: 조건 기반 자연어 탐색 ──
@@ -3603,7 +2306,7 @@ with tab_friends:
                         st.download_button(
                             label="📄 일정표 PDF 저장",
                             data=pdf_bytes_hub,
-                            file_name=f"TripPilot_{dest_name}_2박3일_여행계획표.pdf",
+                            file_name=f"TripPilot_{dest_name}_맞춤_여행계획표.pdf",
                             mime="application/pdf",
                             key=f"hub_dl_pdf_{trip_id}",
                             use_container_width=True,
@@ -3640,8 +2343,31 @@ with tab_friends:
                         )
                     except Exception as e:
                         st.caption(f"캘린더: {e}")
+
+                with st.expander("📱 스마트폰 카메라 스캔용 모바일 일정표 QR 코드", expanded=False):
+                    hub_mobile_url = publish_itinerary_to_mobile_web(
+                        trip_id=trip_id,
+                        dest_name=dest_name,
+                        country=selected_trip["country"],
+                        structured_plan=itin_obj,
+                    )
+                    hub_target_url = hub_mobile_url or f"https://www.google.com/maps/search/{urllib.parse.quote(dest_name + ' 여행')}"
+                    hub_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={urllib.parse.quote(hub_target_url)}&color=064E3B&bgcolor=FAF8F5"
+                    hq1, hq2 = st.columns([1, 2.4], gap="medium")
+                    with hq1:
+                        st.image(hub_qr_url, caption="스마트폰 기본 카메라로 스캔", width=150)
+                    with hq2:
+                        st.markdown(f"#### 📲 동행자 모바일 공유 일정표")
+                        st.markdown(
+                            f"친구들이 스마트폰 카메라로 QR 코드를 비추면 **맞춤 일정표 웹페이지**가 즉시 열립니다!<br/>"
+                            f'<div style="margin-top: 8px;">'
+                            f'<a class="booking-chip" href="{hub_target_url}" target="_blank" style="font-size: 13px; padding: 6px 14px; background: #064E3B; color: #FFFFFF !important; border: none; font-weight: 700;">🌐 모바일 여행 계획표 바로 열기</a>'
+                            f'</div>'
+                            f'<span style="font-size: 11px; color: #059669; word-break: break-all;">🔗 바로가기 링크: <a href="{hub_target_url}" target="_blank" style="color: #059669;">{hub_target_url}</a></span>',
+                            unsafe_allow_html=True,
+                        )
             else:
-                st.caption("💡 먼저 첫 번째 탭에서 2박 3일 일정표를 생성하면 PDF, 웹 가이드북, 캘린더(.ics) 다운로드 버튼이 활성화됩니다!")
+                st.caption("💡 먼저 첫 번째 탭에서 일정표를 생성하면 PDF, 웹 가이드북, 캘린더(.ics) 다운로드 버튼이 활성화됩니다!")
 
             days_summary = []
             for d in itin_obj.get("days", []):
@@ -3649,7 +2375,7 @@ with tab_friends:
                 days_summary.append(f"• Day {d.get('day')}: {spots}")
             care_line = f"\n- 맞춤 배려/알러지 케어: {itin_obj.get('dietary_care_note')}" if itin_obj.get("dietary_care_note") else ""
             share_text = (
-                f"✈️ [{selected_trip['country']} {dest_name} 2박 3일 여행 계획 공유]\n"
+                f"✈️ [{selected_trip['country']} {dest_name} 맞춤 여행 계획 공유]\n"
                 f"- 추천 시기: {selected_trip['best_season']}\n"
                 f"- 예상 예산: {selected_trip['budget_level']}\n"
                 f"- 여행 스타일: {itin_obj.get('applied_style', user_pref_summary)}"

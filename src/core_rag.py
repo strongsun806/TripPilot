@@ -684,10 +684,11 @@ def generate_itinerary(
     user_preference: str = "",
     current_plan: Dict[str, Any] | None = None,
     top_k: int = 4,
+    target_days: int | None = None,
 ) -> Dict[str, Any]:
     """선택한 여행지의 색인된 메타데이터 및 위키백과 문서에 대해
     1차 RAG(개요·메타데이터) + 2차 심층 RAG(랜드마크·미식·근교 코스 MMR 재검색)를 수행하여
-    사용자 취향(또는 수정 피드백)이 반영된 1~3일차 일정표, 지도 동선 좌표, 예산 시뮬레이션, 추천 숙소 및 예약 링크를 생성"""
+    사용자 취향 및 설정 기간(당일치기부터 최대 30일 한달살기까지)이 반영된 맞춤 일정표, 지도 동선 좌표, 예산 시뮬레이션, 추천 숙소 및 예약 링크를 생성"""
     search_q = f"{dest_name} 관광 명소 랜드마크 역사 문화 음식 교통 여행 코스 {user_preference}".strip()
     state_pass1: RAGState = {
         "trip_id": str(trip_id),
@@ -712,19 +713,61 @@ def generate_itinerary(
     )
 
     pref_desc = user_preference.strip() or "핵심 랜드마크 & 현지 맛집 & 여유로운 힐링 밸런스 코스"
+
+    # 여행 기간 (target_days) 자동 감지 및 설정 (최대 30일 한달살기 완벽 지원)
+    if target_days is None or target_days <= 0:
+        target_days = 3
+        if any(w in pref_desc for w in ["한달살기", "한달", "30일", "29박 30일", "29박30일"]):
+            target_days = 30
+        elif any(w in pref_desc for w in ["3주살기", "3주", "21일", "20박 21일", "20박21일"]):
+            target_days = 21
+        elif any(w in pref_desc for w in ["2주살기", "2주", "14일", "13박 14일", "13박14일"]):
+            target_days = 14
+        elif any(w in pref_desc for w in ["열흘", "10일", "9박 10일", "9박10일"]):
+            target_days = 10
+        elif any(w in pref_desc for w in ["일주일", "1주일", "6박 7일", "6박7일", "7일"]):
+            target_days = 7
+        elif any(w in pref_desc for w in ["당일치기", "당일"]):
+            target_days = 1
+        else:
+            m_nd = re.search(r"(\d+)\s*박\s*(\d+)\s*일", pref_desc)
+            if m_nd:
+                target_days = int(m_nd.group(2))
+            else:
+                m_d = re.search(r"(\d+)\s*일(?:간|치)?", pref_desc)
+                if m_d:
+                    target_days = int(m_d.group(1))
+
+    target_days = max(1, min(30, int(target_days)))
+
+    if target_days == 1:
+        duration_label = "당일치기"
+    elif target_days == 30:
+        duration_label = "29박 30일 (한달살기)"
+    elif target_days == 7:
+        duration_label = "6박 7일 (1주일)"
+    elif target_days == 14:
+        duration_label = "13박 14일 (2주 살기)"
+    elif target_days == 21:
+        duration_label = "20박 21일 (3주 살기)"
+    else:
+        duration_label = f"{target_days-1}박 {target_days}일"
     prev_plan_summary = ""
     if current_plan and current_plan.get("days"):
         prev_plan_summary = f"\n[기존 일정 요약 (이 일정을 바탕으로 사용자의 수정 요청·알러지·식이제한을 즉시 반영해 업데이트할 것)]:\n{json.dumps(current_plan.get('days'), ensure_ascii=False)}\n"
 
     json_prompt = f"""당신은 다정하고 똑똑한 AI 여행 아키텍트 봇 **'파일럿 토리 🐣✈️'**입니다.
 아래 [참조 문서]에 등장하는 '{dest_name}'({country})의 실제 명소, 랜드마크, 지역 특성, 문화·미식, 기후/시즌 정보를 바탕으로
-사용자의 취향 및 특별 제약/수정 요청(`{pref_desc}`)을 완벽히 반영한 **맞춤 2박 3일 여행 청사진 및 동선 데이터**를 JSON 형식으로 작성하십시오.
+사용자의 취향 및 특별 제약/수정 요청(`{pref_desc}`)을 완벽히 반영한 **맞춤 {duration_label} (총 {target_days}일치) 여행 청사진 및 동선 데이터**를 JSON 형식으로 작성하십시오.
 {prev_plan_summary}
 [작성 규칙 — 최우선 준수]
 1. **알러지·식이제한·체력/동선 수정 요청 절대 준수**:
    - 사용자가 `'생선 알러지'`, `'해산물 제외'`, `'초밥/회 못 먹음'`, `'갑각류 알러지'`, `'비건'` 등을 언급한 경우, 일정(`place`, `activity`, `tip`)에서 생선·초밥·수산시장 해산물 시식 코스를 **100% 완전히 제거**하고, 해당 도시의 다른 유명한 육류/면류/디저트/온천/문화 코스로 대체하십시오.
    - 특정 일차/시간대 수정 요청(예: `'2일차 실내 코스로'`, `'늦잠 모드 11시 시작'`, `'많이 걷는 곳 제외'`)이 있으면 해당 부분을 정확히 수정하고, `dietary_care_note`와 `bot_message`에 어떤 요청을 어떻게 반영해 수정했는지 구체적으로 설명하십시오.
-2. 문서에 확인된 실제 명소와 특징을 중심으로 1일차, 2일차, 3일차(오전/오후/저녁) 코스를 동선이 꼬이지 않게 구성하십시오.
+2. 문서에 확인된 실제 명소와 특징을 중심으로 **1일차부터 {target_days}일차까지 정확히 {target_days}개의 일차(`day` 객체)**를 `days` 배열에 포함하여 동선이 꼬이지 않게 구성하십시오.
+   - 단기(1~5일): 각 일차마다 오전/오후/저녁 총 3개 방문지(`schedule` 아이템)를 포함하십시오.
+   - 중기(6~10일): 각 일차마다 주간 핵심 1~2개와 저녁 1개, 총 2~3개 방문지를 포함하십시오.
+   - 장기/한달살기(11~30일): 각 일차마다 주간 1개와 저녁 1개(총 2개 슬롯)로 간결하게 작성하고, 각 스팟 설명은 1~2문장으로 압축하여 응답 토큰 한도를 초과하지 않도록 하십시오.
 3. 각 활동 설명(`activity`), 봇 인사말(`bot_message`), 여행 팁 문장 끝에는 참조한 문서 번호인 `[근거 1]`, `[근거 2]` 등을 자연스럽게 포함하십시오.
 4. 지도에 동선을 표시하기 위해 각 방문지(`place`)의 실제 위도(`lat`)와 경도(`lng`)를 서로 겹치지 않게 소수점 4자리 실수(float)로 정확히 기입하십시오.
 5. 출력은 반드시 파싱 가능한 순수 JSON 객체만 반환하십시오.
@@ -829,7 +872,7 @@ def generate_itinerary(
     days_list = structured_plan.get("days", [])
     all_places_flat = []
 
-    md_lines = [f"### 🌿 {dest_name} 맞춤 2박 3일 여행 일정표\n"]
+    md_lines = [f"### 🌿 {dest_name} 맞춤 {duration_label} 여행 일정표\n"]
     if structured_plan.get("applied_style"):
         md_lines.append(f"- **반영된 여행 스타일**: `{structured_plan['applied_style']}`\n")
 
@@ -897,9 +940,9 @@ def generate_itinerary(
 
     answer_md = safe_md("\n".join(md_lines))
     bot_msg = safe_md(structured_plan.get("bot_message") or (
-        f"🐣 짜잔! **{dest_name}**의 위키백과 정보와 기본 제원을 바탕으로 맞춤 2박 3일 여행 일정과 동선 지도를 완성했어! [근거 1]\n\n"
-        f"**오른쪽 플래너 창**에서 `1일차` · `2일차` · `3일차` 탭을 눌러가며 지도 동선과 숙소·구글맵 링크를 확인해 봐! "
-        f"혹시 **'2일차는 늦잠 모드로 바꿔줘'** 라거나 **'비 올 때 실내 코스로 바꿔줘'** 같은 요청이 있으면 나한테 바로 말해줘! ✈️💛"
+        f"🐣 짜잔! **{dest_name}**의 위키백과 정보와 기본 제원을 바탕으로 맞춤 {duration_label} 여행 일정과 일자별 동선 지도를 완성했어! [근거 1]\n\n"
+        f"**오른쪽 플래너 창**에서 일차별 탭을 눌러가며 각 날짜의 지도 동선과 숙소·구글맵 링크를 확인해 봐! "
+        f"혹시 **'특정 일차는 늦잠 모드로 바꿔줘'** 라거나 **'비 올 때 실내 코스로 바꿔줘'** 같은 요청이 있으면 나한테 바로 말해줘! ✈️💛"
     ))
 
     combined_for_citations = f"{bot_msg}\n{answer_md}"
@@ -924,14 +967,25 @@ def _strip_emoji_for_pdf(text: str) -> str:
     return cleaned.strip()
 
 
+def _clean_pdf_text(text: str) -> str:
+    """PDF 출력용: 근거1, 근거7 등 불필요한 인용 표기 및 이모지를 말끔히 제거하여 깔끔한 여행 가이드북으로 정돈"""
+    if not text:
+        return ""
+    text = re.sub(r"\[근거\s*\d+(?:[,\s]*\d+)*\]", "", text)
+    text = re.sub(r"\(근거\s*\d+(?:[,\s]*\d+)*\)", "", text)
+    text = re.sub(r"\[\d+(?:[,\s]*\d+)*\]", "", text)
+    return _strip_emoji_for_pdf(text).strip()
+
+
 def export_itinerary_pdf_bytes(
     trip_item: Dict[str, Any],
     structured_plan: Dict[str, Any],
     checklist: List[Dict[str, Any]] | None = None,
     dutch_summary: str = "",
 ) -> bytes:
-    """완성된 2박 3일 맞춤 여행 계획표·알러지 배려 사항·추천 숙소·예산·체크리스트를 한글 PDF 바이트로 생성"""
+    """완성된 맞춤 여행 계획표·동선 지도 이미지·추천 숙소·예산·체크리스트를 오트밀 & 포레스트 그린 테마의 한글 PDF로 생성"""
     from fpdf import FPDF
+    from pdf_route_map import generate_itinerary_route_map_image
 
     if "structured_plan" in structured_plan and isinstance(structured_plan["structured_plan"], dict):
         structured_plan = structured_plan["structured_plan"]
@@ -941,6 +995,7 @@ def export_itinerary_pdf_bytes(
     continent = trip_item.get("continent", "")
     season = trip_item.get("best_season", "")
     budget = trip_item.get("budget_level", "")
+    days_count = len(structured_plan.get("days", [])) or 3
     applied_style = structured_plan.get("applied_style", "맞춤형 여행 코스")
     care_note = structured_plan.get("dietary_care_note", "")
 
@@ -958,50 +1013,102 @@ def export_itinerary_pdf_bytes(
     else:
         font_family = "Helvetica"
 
-    # 상단 헤더 배너
-    pdf.set_fill_color(5, 150, 105)
-    pdf.rect(10, 10, 190, 28, style="F")
-    pdf.set_xy(15, 14)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font(font_family, "B", 16)
-    pdf.cell(180, 9, _strip_emoji_for_pdf(f"TripPilot | [{country}] {dest_name} 2박 3일 맞춤 여행 계획표"), new_x="LMARGIN", new_y="NEXT")
-    pdf.set_x(15)
-    pdf.set_font(font_family, "", 10)
-    pdf.cell(180, 6, _strip_emoji_for_pdf(f"대륙: {continent}  |  추천 시기: {season}  |  예상 경비: {budget}"), new_x="LMARGIN", new_y="NEXT")
-    pdf.set_x(15)
-    pdf.cell(180, 6, _strip_emoji_for_pdf(f"반영된 취향: {applied_style}"[:95]), new_x="LMARGIN", new_y="NEXT")
+    if days_count == 1:
+        dur_label_pdf = "당일치기"
+    elif days_count == 30:
+        dur_label_pdf = "29박 30일 (한달살기)"
+    elif days_count == 7:
+        dur_label_pdf = "6박 7일 (1주일)"
+    elif days_count == 14:
+        dur_label_pdf = "13박 14일 (2주 살기)"
+    elif days_count == 21:
+        dur_label_pdf = "20박 21일 (3주 살기)"
+    else:
+        dur_label_pdf = f"{days_count-1}박 {days_count}일"
 
-    pdf.ln(8)
+    # 상단 헤더 배너 (따스한 오트밀 & 딥 포레스트 그린)
+    pdf.set_fill_color(6, 78, 59)
+    pdf.rect(10, 10, 190, 28, style="F")
+    pdf.set_xy(15, 12)
+    pdf.set_text_color(255, 255, 255)
+    title_str = _clean_pdf_text(f"TripPilot | [{country}] {dest_name} {dur_label_pdf} 맞춤 여행 가이드북")
+    if len(title_str) > 28:
+        pdf.set_font(font_family, "B", 12)
+    else:
+        pdf.set_font(font_family, "B", 13.5)
+    pdf.cell(180, 7.5, title_str, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(15)
+    pdf.set_font(font_family, "", 8.5)
+    meta_str = _clean_pdf_text(f"대륙: {continent}  |  추천 시기: {season}  |  예상 경비: {budget}")
+    pdf.cell(180, 4.8, meta_str, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(15)
+    pdf.set_font(font_family, "", 8.5)
+    style_str = _clean_pdf_text(f"반영된 취향: {applied_style}")
+    if len(style_str) > 65:
+        style_str = style_str[:62] + "..."
+    pdf.cell(180, 4.8, style_str, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_y(41)
     pdf.set_text_color(15, 41, 30)
+
+    temp_map_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    os.makedirs(temp_map_dir, exist_ok=True)
 
     if care_note:
         pdf.set_fill_color(236, 253, 245)
-        pdf.set_font(font_family, "B", 10)
-        pdf.multi_cell(190, 7, _strip_emoji_for_pdf(f"[맞춤 알러지/배려 반영] {care_note}"), border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_draw_color(167, 243, 208)
+        pdf.set_font(font_family, "B", 9.5)
+        pdf.set_text_color(6, 78, 59)
+        pdf.multi_cell(190, 6.5, _clean_pdf_text(f"[맞춤 알러지/배려 케어] {care_note}"), border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(3)
 
-    # 일차별 상세 일정
+    # 일차별 상세 일정 및 일자별 분할 동선 지도 (동선 뭉침 100% 방지)
     for day_obj in structured_plan.get("days", []):
-        d_num = day_obj.get("day", 1)
-        t_title = _strip_emoji_for_pdf(day_obj.get("theme_title", f"{d_num}일차 코스"))
-        stay_area = _strip_emoji_for_pdf(day_obj.get("stay_area", dest_name))
+        d_num = int(day_obj.get("day", 1))
+        t_title = _clean_pdf_text(day_obj.get("theme_title", f"{d_num}일차 코스"))
+        stay_area = _clean_pdf_text(day_obj.get("stay_area", dest_name))
+
+        # 일차별 시작 전 페이지 잔여 높이가 부족하면 다음 페이지로 깔끔하게 넘김
+        if pdf.get_y() > 145:
+            pdf.add_page()
 
         pdf.set_fill_color(240, 253, 244)
-        pdf.set_font(font_family, "B", 12)
-        pdf.cell(190, 9, f"Day {d_num} - {t_title}  (추천 숙소 거점: {stay_area})", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_draw_color(167, 243, 208)
+        pdf.set_text_color(6, 78, 59)
+        pdf.set_font(font_family, "B", 11.5)
+        pdf.cell(190, 8.5, f"Day {d_num} - {t_title}  (추천 숙소: {stay_area})", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+        # 🗺️ 해당 일차 전용 분할 동선 지도 삽입 (여러 일차가 겹쳐서 뭉치는 현상 차단)
+        if d_num <= 7 or days_count <= 10:
+            day_map_path = os.path.join(temp_map_dir, f"map_pdf_{trip_item.get('id', 'temp')}_day{d_num}.jpg")
+            try:
+                day_map_ok = generate_itinerary_route_map_image(
+                    dest_name,
+                    structured_plan,
+                    day_map_path,
+                    selected_day=d_num,
+                    width=760,
+                    height=250,
+                )
+                if day_map_ok and os.path.exists(day_map_path):
+                    cur_y = pdf.get_y()
+                    pdf.image(day_map_path, x=10, y=cur_y, w=190, h=62)
+                    pdf.set_y(cur_y + 65)
+            except Exception:
+                pass
 
         for idx, item in enumerate(day_obj.get("schedule", []), start=1):
-            t_slot = _strip_emoji_for_pdf(item.get("time_slot", ""))
-            place = _strip_emoji_for_pdf(item.get("place", ""))
-            trans = _strip_emoji_for_pdf(item.get("transport", "도보/대중교통"))
-            act = _strip_emoji_for_pdf(item.get("activity", ""))
-            tip = _strip_emoji_for_pdf(item.get("tip", ""))
+            t_slot = _clean_pdf_text(item.get("time_slot", ""))
+            place = _clean_pdf_text(item.get("place", ""))
+            trans = _clean_pdf_text(item.get("transport", "도보/대중교통"))
+            act = _clean_pdf_text(item.get("activity", ""))
+            tip = _clean_pdf_text(item.get("tip", ""))
 
             pdf.set_font(font_family, "B", 10)
             pdf.set_text_color(6, 78, 59)
             pdf.multi_cell(190, 6, f"  {idx}. [{t_slot}] {place}  (이동: {trans})", new_x="LMARGIN", new_y="NEXT")
             pdf.set_font(font_family, "", 9.5)
-            pdf.set_text_color(30, 41, 59)
+            pdf.set_text_color(15, 41, 30)
             pdf.multi_cell(190, 5.5, f"     - 활동: {act}", new_x="LMARGIN", new_y="NEXT")
             if tip:
                 pdf.set_text_color(5, 150, 105)
@@ -1015,11 +1122,11 @@ def export_itinerary_pdf_bytes(
         pdf.set_font(font_family, "B", 11)
         pdf.cell(190, 8, "추천 숙소 거점 안내", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font(font_family, "", 9.5)
-        pdf.set_text_color(30, 41, 59)
+        pdf.set_text_color(15, 41, 30)
         for s in stays:
-            area = _strip_emoji_for_pdf(s.get("area_name", ""))
-            style = _strip_emoji_for_pdf(s.get("style", ""))
-            reason = _strip_emoji_for_pdf(s.get("reason", ""))
+            area = _clean_pdf_text(s.get("area_name", ""))
+            style = _clean_pdf_text(s.get("style", ""))
+            reason = _clean_pdf_text(s.get("reason", ""))
             pdf.multi_cell(190, 5.5, f"• {area} ({style}): {reason}", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
 
@@ -1111,7 +1218,7 @@ def export_itinerary_html_bytes(
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TripPilot | [{country}] {dest_name} 2박 3일 여행 가이드북</title>
+<title>TripPilot | [{country}] {dest_name} 여행 가이드북</title>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1141,7 +1248,7 @@ def export_itinerary_html_bytes(
         <button class="print-btn" onclick="window.print()">🖨️ 지금 화면 PDF 저장 / 인쇄하기</button>
     </div>
     <div class="hero">
-        <h1>✈️ [{country}] {dest_name} 2박 3일 맞춤 여행 계획표</h1>
+        <h1>✈️ [{country}] {dest_name} 맞춤 여행 계획표</h1>
         <p style="margin:4px 0 10px 0;color:#2C5243;font-size:14px;">반영된 여행 스타일: <b>{applied_style}</b></p>
         <div class="meta-tags">
             <span>🗓️ 추천 시기: {season}</span>
