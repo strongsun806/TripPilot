@@ -137,10 +137,7 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
     - 타이포그래피 & 버튼: 딥 포레스트 그린 (#064E3B, #0F291E)과 파스텔 에메랄드 (#ECFDF5)
     - 실사 풍경 포토와 히어로 배너 내 텍스트는 100% 순백색(#FFFFFF) 고대비 보장
     """
-    css_and_bg = """
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <style>
+    css_styles = """<style>
     /* ── [외부 웹폰트 및 아이콘 폰트 최우선 선언: CSS 명세 준수] ── */
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
@@ -667,8 +664,10 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         background: #10B981;
         color: #FFFFFF !important;
     }
-    </style>
+    </style>"""
+    st.markdown(css_styles, unsafe_allow_html=True)
 
+    bg_ambient_html = """
     <div class="ambient-stage">
         <div class="leaf-drift leaf-1">🍃</div>
         <div class="leaf-drift leaf-2">🌿</div>
@@ -676,7 +675,7 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         <div class="leaf-drift leaf-4">🌿</div>
     </div>
     """
-    st.markdown(css_and_bg, unsafe_allow_html=True)
+    st.markdown(bg_ambient_html, unsafe_allow_html=True)
 
 
 
