@@ -77,6 +77,10 @@ from nature_visuals import (
     get_pilot_tori_b64,
 )
 from publish_mobile_itinerary import publish_itinerary_to_mobile_web
+try:
+    from src.service import l1_cache
+except ImportError:
+    from service import l1_cache
 
 load_dotenv()
 
@@ -2125,6 +2129,17 @@ with st.sidebar:
         st.session_state.chat_constraints_by_trip.pop(trip_id, None)
         st.toast("현재 여행지의 대화와 일정이 깨끗하게 초기화되었습니다! 🐣", icon="✨")
         st.rerun()
+
+    with st.expander("⚡ 0-Token L1 스마트 캐시 엔진", expanded=False):
+        cache_stats = l1_cache.get_stats()
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            st.metric("캐시 적중률", f"{cache_stats['hit_ratio_percent']}%")
+            st.metric("절감 토큰", f"{cache_stats['saved_tokens']:,} T")
+        with c_col2:
+            st.metric("평균 응답 속도", f"{cache_stats['avg_latency_ms']}ms")
+            st.metric("단축 시간", f"{cache_stats['saved_latency_sec']}s")
+        st.caption("0-Token L1 인메모리 스마트 캐시 및 비동기 가속 엔진 활성화")
 
     st.divider()
     st.warning(DISCLAIMER_TEXT)
