@@ -1,4 +1,4 @@
-"""
+﻿"""
 LangGraph 기반 다단계(Multi-Stage / 2-Pass: retrieve -> deep_retrieve -> generate) RAG 워크플로우 및
 취향 맞춤형 여행 일정·동선 설계(Human-in-the-Loop 대화형 수정 포함), 조건 기반 자연어 탐색 모듈
 """
@@ -48,6 +48,32 @@ llm = ChatOpenAI(**llm_kwargs)
 CITE_REGEX = re.compile(r"\[근거\s*([\d,\s]+)\]")
 
 
+def strip_citations(text: str) -> str:
+    """
+    답변 본문, 일정표, 팁, 챗봇 메시지 등 사용자 화면에 노출되는 모든 텍스트에서
+    [근거 6], [근거 1, 2], [근거 1~3], (근거 6), [6] 등 기계적인 인용 표기 일체를 완벽 제거하여
+    자연스럽고 읽기 쉬운 문장으로 정돈합니다.
+    """
+    if not isinstance(text, str) or not text:
+        return text if text is not None else ""
+    # 1. 괄호 포함 ([근거 N] 포함), [근거 N 포함] 등 제거
+    cleaned = re.sub(r"\(\s*\[근거\s*[\d,\s~-]+\]\s*포함\s*\)", "", text)
+    cleaned = re.sub(r"\[\s*근거\s*[\d,\s~-]+\s*포함\s*\]", "", cleaned)
+    # 2. [근거 1], [근거 1, 2], [근거 1~3], [근거 6] 등 대괄호 근거 표기 제거
+    cleaned = re.sub(r"\[근거\s*[\d,\s~-]+\]", "", cleaned)
+    # 3. (근거 1), (근거 1, 2), (근거 6) 등 소괄호 근거 표기 제거
+    cleaned = re.sub(r"\(근거\s*[\d,\s~-]+\)", "", cleaned)
+    # 4. 【근거 1】 등 특수 괄호 근거 표기 제거
+    cleaned = re.sub(r"【근거\s*[\d,\s~-]+】", "", cleaned)
+    # 5. [1], [2], [1, 2] 와 같이 남은 단독 대괄호 숫자 인용 제거 (단 마크다운 링크 [텍스트](url)는 보존)
+    cleaned = re.sub(r"(?<!\]\()\s*\[\d+(?:[,\s]*\d+)*\]", "", cleaned)
+    # 6. 불필요한 연속 공백 정리
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    # 7. 문장 부호 앞의 어색한 공백 정리
+    cleaned = re.sub(r"\s+([.,!?])", r"\1", cleaned)
+    return cleaned.strip()
+
+
 def clean_ai_artifacts(text: str) -> str:
     """
     사용자 화면(배너, 일정표, 요약)에 노출되는 문구에서 [근거 N] 인용 태그 및 ** 마크다운 표시를 완전히 제거하여
@@ -55,12 +81,10 @@ def clean_ai_artifacts(text: str) -> str:
     """
     if not isinstance(text, str) or not text:
         return text if text is not None else ""
-    # 1. [근거 N], [근거 1, 2], [근거1] 등 인용 태그 제거
-    cleaned = re.sub(r"\[근거\s*\d+(?:[,\s]*\d+)*\]", "", text)
-    # 2. **텍스트** 형태의 마크다운 볼드 기호 제거
+    cleaned = strip_citations(text)
+    # **텍스트** 형태의 마크다운 볼드 기호 제거
     cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
     cleaned = cleaned.replace("**", "")
-    # 3. 불필요한 연속 공백 정리
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned).strip()
     return cleaned
 
@@ -640,12 +664,12 @@ def generate_node(state: RAGState) -> Dict[str, Any]:
             HumanMessage(content=human_prompt),
         ]).content.strip()
     except Exception:
-        response = f"🐣 {dest_name} 기본 정보야! {context_docs[0]['content']} [근거 1]."
+        response = f"🐣 {dest_name} 기본 정보야! {context_docs[0]['content']}."
 
     cited_sources = extract_cited_sources(response, context_docs)
 
     return {
-        "answer": response,
+        "answer": strip_citations(response),
         "cited_sources": cited_sources,
     }
 
@@ -691,7 +715,7 @@ def query_trip_pilot(
 
     result = rag_app.invoke(initial_state)
     return {
-        "answer": safe_md(result["answer"]),
+        "answer": strip_citations(safe_md(result["answer"])),
         "cited_sources": result["cited_sources"],
         "all_contexts": result["context_docs"],
         "expanded_queries": result.get("expanded_queries", []),
@@ -920,8 +944,10 @@ def generate_itinerary(
             item["klook_url"] = klook_url
 
             t_slot = item.get("time_slot", "")
-            act = item.get("activity", "")
-            tip = item.get("tip", "")
+            act = strip_citations(item.get("activity", ""))
+            tip = strip_citations(item.get("tip", ""))
+            item["activity"] = act
+            item["tip"] = tip
             trans = item.get("transport", "도보/대중교통")
             links_inline = f"[📍 구글 지도]({gmap_url}) [🍽️ 주변 맛집]({food_url}) [🎟️ 티켓/투어]({klook_url})"
             desc_cell = f"{act}" + (f" *(💡 {tip})*" if tip else "") + f"<br/>{links_inline}"
@@ -934,6 +960,7 @@ def generate_itinerary(
 
     stays = structured_plan.get("recommended_stays", [])
     for s in stays:
+        s["reason"] = strip_citations(s.get("reason", ""))
         s["links"] = make_booking_links(dest_name, country, s.get("area_name", ""))
 
     md_lines.append(f"\n### 🏨 {dest_name} 추천 숙소 거점 및 원클릭 예약")
@@ -952,9 +979,13 @@ def generate_itinerary(
                 f"[🛏️ 구글 호텔]({links['google_hotels']})"
             )
 
-    best_season_tip = structured_plan.get("best_season_tip", "")
-    budget_tip = structured_plan.get("budget_transport_tip", "")
-    plan_b_tip = structured_plan.get("plan_b_tip", "")
+    best_season_tip = strip_citations(structured_plan.get("best_season_tip", ""))
+    budget_tip = strip_citations(structured_plan.get("budget_transport_tip", ""))
+    plan_b_tip = strip_citations(structured_plan.get("plan_b_tip", ""))
+    structured_plan["best_season_tip"] = best_season_tip
+    structured_plan["budget_transport_tip"] = budget_tip
+    structured_plan["plan_b_tip"] = plan_b_tip
+
     if best_season_tip or budget_tip or plan_b_tip:
         md_lines.append(f"\n### 🔍 플래너 토리의 맞춤 여행 꿀팁")
         if best_season_tip:
@@ -966,18 +997,24 @@ def generate_itinerary(
 
     answer_md = safe_md("\n".join(md_lines))
     bot_msg = safe_md(structured_plan.get("bot_message") or (
-        f"🐣 짜잔! **{dest_name}**의 위키백과 정보와 기본 제원을 바탕으로 맞춤 {duration_label} 여행 일정과 일자별 동선 지도를 완성했어! [근거 1]\n\n"
+        f"🐣 짜잔! **{dest_name}**의 위키백과 정보와 기본 제원을 바탕으로 맞춤 {duration_label} 여행 일정과 일자별 동선 지도를 완성했어!\n\n"
         f"**오른쪽 플래너 창**에서 일차별 탭을 눌러가며 각 날짜의 지도 동선과 숙소·구글맵 링크를 확인해 봐! "
         f"혹시 **'특정 일차는 늦잠 모드로 바꿔줘'** 라거나 **'비 올 때 실내 코스로 바꿔줘'** 같은 요청이 있으면 나한테 바로 말해줘! ✈️💛"
     ))
 
     combined_for_citations = f"{bot_msg}\n{answer_md}"
+    extracted_sources = extract_cited_sources(combined_for_citations, context_docs)
+
+    # 사용자 화면 노출용 답변 및 챗봇 메시지에서 [근거 N] 인용 표기 완벽 제거
+    clean_answer_md = strip_citations(answer_md)
+    clean_bot_msg = strip_citations(bot_msg)
+    structured_plan["bot_message"] = clean_bot_msg
 
     return {
-        "answer": answer_md,
-        "bot_message": bot_msg,
+        "answer": clean_answer_md,
+        "bot_message": clean_bot_msg,
         "structured_plan": structured_plan,
-        "cited_sources": extract_cited_sources(combined_for_citations, context_docs),
+        "cited_sources": extracted_sources,
         "all_contexts": context_docs,
         "expanded_queries": expanded_queries,
     }
@@ -1361,9 +1398,10 @@ def verify_travel_claim(trip_id: str, dest_name: str, claim: str, top_k: int = 3
 {context_text}
 """
     answer = llm.invoke([HumanMessage(content=prompt)]).content.strip()
+    cited_sources = extract_cited_sources(answer, context_docs)
     return {
-        "answer": answer,
-        "cited_sources": extract_cited_sources(answer, context_docs),
+        "answer": strip_citations(answer),
+        "cited_sources": cited_sources,
         "all_contexts": context_docs,
     }
 
@@ -1972,4 +2010,5 @@ def get_monthly_packing_and_weather(dest_name: str, country: str, month: int) ->
         "clothes_guide": clothes,
         "checklist_extra": checklist_extra,
     }
+
 

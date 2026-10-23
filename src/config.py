@@ -8,6 +8,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Streamlit Community Cloud 환경 배포 시 st.secrets 자동 동기화 지원
+try:
+    import streamlit as st
+    if hasattr(st, "secrets"):
+        for k, v in st.secrets.items():
+            if isinstance(v, str) and k not in os.environ:
+                os.environ[k] = v
+except Exception:
+    pass
+
 # 1. 디렉터리 및 파일 경로 설정
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -24,11 +34,25 @@ DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
 
 
 def get_api_key() -> str:
-    return (os.getenv("OPENAI_API_KEY") or os.getenv("GMS_KEY") or "").strip()
+    key = os.getenv("OPENAI_API_KEY") or os.getenv("GMS_KEY")
+    if not key:
+        try:
+            import streamlit as st
+            key = st.secrets.get("OPENAI_API_KEY") or st.secrets.get("GMS_KEY")
+        except Exception:
+            pass
+    return (key or "").strip()
 
 
 def get_base_url() -> str:
-    raw_url = (os.getenv("OPENAI_BASE_URL") or DEFAULT_API_BASE_URL).strip()
+    url = os.getenv("OPENAI_BASE_URL")
+    if not url:
+        try:
+            import streamlit as st
+            url = st.secrets.get("OPENAI_BASE_URL")
+        except Exception:
+            pass
+    raw_url = (url or DEFAULT_API_BASE_URL).strip()
     # 프록시 기본 엔드포인트 입력 시 실제 OpenAI 호환 프록시 경로로 자동 보정 지원
     clean = raw_url.rstrip("/")
     if clean.endswith("/api/v1") and "gms" in clean:

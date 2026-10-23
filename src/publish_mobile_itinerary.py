@@ -8,7 +8,7 @@ import json
 import urllib.request
 import urllib.parse
 from typing import Dict, Any, Optional
-from src.core_rag import clean_ai_artifacts
+from src.core_rag import clean_ai_artifacts, strip_citations
 
 _TELEGRAPH_TOKEN: Optional[str] = None
 _MOBILE_URL_CACHE: Dict[str, str] = {}
@@ -70,8 +70,8 @@ def build_itinerary_markdown(
         for idx, sc in enumerate(schedule, 1):
             p_name = sc.get("place", "")
             t_slot = sc.get("time_slot", "")
-            act = sc.get("activity", "")
-            tip = sc.get("tip", "")
+            act = strip_citations(sc.get("activity", ""))
+            tip = strip_citations(sc.get("tip", ""))
             trans = sc.get("transport", "")
 
             md_lines.append(f"### {idx}. 📍 {p_name} ({t_slot})")

@@ -52,6 +52,7 @@ from core_rag import (
     get_monthly_packing_and_weather,
     safe_md,
     clean_ai_artifacts,
+    strip_citations,
 )
 import importlib
 import nature_visuals
@@ -137,7 +138,15 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
     - 실사 풍경 포토와 히어로 배너 내 텍스트는 100% 순백색(#FFFFFF) 고대비 보장
     """
     css_and_bg = """
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <style>
+    /* ── [외부 웹폰트 및 아이콘 폰트 최우선 선언: CSS 명세 준수] ── */
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+
     /* ── [눈누 Y이드스트릿체 (Yidstreet / Ydestreet / Y이든스트릿) 웹폰트 CDN] ── */
     @font-face {
         font-family: 'Yidstreet';
@@ -181,9 +190,7 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         font-style: normal;
         font-display: swap;
     }
-    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
+
 
     :root {
         color-scheme: light !important;
@@ -231,21 +238,32 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         word-wrap: normal !important;
         white-space: nowrap !important;
         direction: ltr !important;
-    }
-
-    /* Expander 요약 줄 레이아웃: 화살표 아이콘과 제목 분리 및 정렬 */
-    div[data-testid="stExpander"] summary {
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-    }
-    div[data-testid="stExpander"] summary > span[data-testid="stExpanderToggleIcon"] {
-        min-width: 24px !important;
         width: 24px !important;
+        min-width: 24px !important;
+        max-width: 24px !important;
+        height: 24px !important;
+        overflow: hidden !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         flex-shrink: 0 !important;
+    }
+
+    /* Expander 요약 줄 레이아웃: 화살표 아이콘과 제목 분리 및 정렬 (텍스트 겹침 원천 차단) */
+    div[data-testid="stExpander"] summary {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        cursor: pointer !important;
+        position: relative !important;
+    }
+    div[data-testid="stExpander"] summary div[data-testid="stMarkdownContainer"] {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+    div[data-testid="stExpander"] summary p {
+        margin: 0 !important;
+        line-height: 1.5 !important;
     }
 
     /* 전체 앱 배경: 부드러운 밝은 오트밀(아이보리) 그라데이션 */
@@ -725,9 +743,9 @@ def render_cited_sources(
                 content = src.get("content", "")
 
                 if str(url).startswith("http"):
-                    st.markdown(f"**[근거 {idx}]** {title} · `{src_type}` · `{rag_stage}` · [원문 보기]({url})")
+                    st.markdown(f"**[참고 출처 {idx}]** {title} · `{src_type}` · `{rag_stage}` · [원문 보기]({url})")
                 else:
-                    st.markdown(f"**[근거 {idx}]** {title} · `{src_type}` · `{rag_stage}`")
+                    st.markdown(f"**[참고 출처 {idx}]** {title} · `{src_type}` · `{rag_stage}`")
 
                 if content:
                     preview = content[:260] + ("..." if len(content) > 260 else "")
@@ -1077,7 +1095,7 @@ def render_background_task_monitor(trip_id: str, dest_name: str, duration_label:
                     if trip_id in st.session_state.messages_by_trip:
                         st.session_state.messages_by_trip[trip_id].append({
                             "role": "assistant",
-                            "content": itin_res.get("bot_message", itin_res.get("answer", "")),
+                            "content": strip_citations(itin_res.get("bot_message", itin_res.get("answer", ""))),
                             "cited_sources": itin_res.get("cited_sources", []),
                             "all_contexts": itin_res.get("all_contexts", []),
                             "expanded_queries": itin_res.get("expanded_queries", []),
@@ -1090,7 +1108,7 @@ def render_background_task_monitor(trip_id: str, dest_name: str, duration_label:
                     if trip_id in st.session_state.messages_by_trip:
                         st.session_state.messages_by_trip[trip_id].append({
                             "role": "assistant",
-                            "content": res_p["answer"],
+                            "content": strip_citations(res_p["answer"]),
                             "cited_sources": res_p.get("cited_sources", []),
                             "all_contexts": res_p.get("all_contexts", []),
                             "expanded_queries": res_p.get("expanded_queries", []),
@@ -1520,7 +1538,7 @@ def render_interactive_planner_panel(
     # 2) 선택된 탭별 상세 일정표 / 예산·숙소 뷰
     if active_day == 0:
         with st.container(border=True):
-            st.markdown(itin_data["answer"])
+            st.markdown(strip_citations(itin_data["answer"]))
     elif 1 <= active_day <= num_days:
         matching_days = [d for d in days_list if int(d.get("day", 0)) == active_day]
         if matching_days:
@@ -1532,8 +1550,8 @@ def render_interactive_planner_panel(
             for idx, item in enumerate(d_obj.get("schedule", []), start=1):
                 place = html.escape(str(item.get("place", dest_name)))
                 t_slot = html.escape(str(item.get("time_slot", "")))
-                act = html.escape(str(item.get("activity", "")))
-                tip = html.escape(str(item.get("tip", "")))
+                act = html.escape(strip_citations(str(item.get("activity", ""))))
+                tip = html.escape(strip_citations(str(item.get("tip", ""))))
                 trans = html.escape(str(item.get("transport", "도보/대중교통")))
                 gmap = item.get("google_maps_url") or make_google_maps_url(item.get("place", dest_name), dest_name, country)
                 food_url = item.get("food_url") or make_google_maps_url(f"{item.get('place', dest_name)} 맛집", dest_name, country)
@@ -1655,7 +1673,7 @@ def render_interactive_planner_panel(
                 links = s.get("links") or make_booking_links(dest_name, country, s.get("area_name", ""))
                 with st.container(border=True):
                     st.markdown(f"**{s.get('area_name', dest_name)}** (`{s.get('style', '추천 숙소')}`)")
-                    st.write(s.get("reason", ""))
+                    st.write(strip_citations(s.get("reason", "")))
                     st.markdown(
                         f'<a class="booking-chip" href="{links["google_maps"]}" target="_blank">📍 구글 지도</a>'
                         f'<a class="booking-chip" href="{links["agoda"]}" target="_blank">🏨 아고다 최저가</a>'
@@ -2361,7 +2379,7 @@ graph LR
             for msg in current_messages:
                 avatar_icon = "🐣" if msg["role"] == "assistant" else "🧳"
                 with st.chat_message(msg["role"], avatar=avatar_icon):
-                    st.markdown(msg["content"])
+                    st.markdown(strip_citations(msg["content"]))
                     if msg["role"] == "assistant" and msg.get("cited_sources"):
                         render_cited_sources(
                             msg.get("cited_sources", []),
@@ -2766,7 +2784,7 @@ with tab_factcheck:
             )
             fc_res = verify_travel_claim(trip_id=trip_id, dest_name=dest_name, claim=claim_input, top_k=top_k_val)
             s2.update(label="✓ 사실 확인 완료", state="complete", expanded=False)
-        st.markdown(fc_res["answer"])
+        st.markdown(strip_citations(fc_res["answer"]))
         render_cited_sources(fc_res["cited_sources"], fc_res["all_contexts"])
 
 st.divider()
