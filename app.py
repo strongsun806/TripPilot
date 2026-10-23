@@ -183,6 +183,7 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
     }
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
 
     :root {
         color-scheme: light !important;
@@ -192,13 +193,59 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         --text-color: #0F291E !important;
     }
 
-    html, body, [class*="css"], .stApp,
-    button, input, select, textarea,
-    div[data-testid*="st"], [data-baseweb],
-    h1, h2, h3, h4, h5, h6, p, span, a, label {
+    /* 전역 기본 폰트: Y이드스트릿체 (아이콘 폰트 제외) */
+    html, body, .stApp,
+    h1, h2, h3, h4, h5, h6,
+    input, select, textarea,
+    p:not([data-testid*="Icon"]):not(.material-symbols-rounded),
+    a:not([data-testid*="Icon"]):not(.material-symbols-rounded),
+    label:not([data-testid*="Icon"]):not(.material-symbols-rounded),
+    div[data-testid="stMarkdownContainer"] *:not([data-testid*="Icon"]):not(.material-symbols-rounded):not(.material-icons),
+    div[data-testid="stText"],
+    div[data-testid="stExpander"] summary p,
+    .stButton button *:not([data-testid*="Icon"]),
+    .stDownloadButton button *:not([data-testid*="Icon"]) {
         font-family: 'Yidstreet', 'Ydestreet', 'Y이든스트릿', 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
         color: #0F291E;
         scroll-behavior: smooth !important;
+    }
+
+    /* ── [Streamlit Material Symbols 아이콘 폰트 복원 및 보호] ── */
+    [data-testid="stIconMaterial"],
+    [data-testid*="Icon"],
+    [data-testid="stExpanderToggleIcon"],
+    [data-testid="stExpanderToggleIcon"] *,
+    .material-symbols-rounded,
+    .material-symbols-outlined,
+    .material-symbols-sharp,
+    .material-icons,
+    [class*="MaterialIcon"] {
+        font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+        font-feature-settings: 'liga' 1 !important;
+        font-variant-ligatures: normal !important;
+        font-style: normal !important;
+        font-weight: normal !important;
+        line-height: 1 !important;
+        text-transform: none !important;
+        letter-spacing: normal !important;
+        word-wrap: normal !important;
+        white-space: nowrap !important;
+        direction: ltr !important;
+    }
+
+    /* Expander 요약 줄 레이아웃: 화살표 아이콘과 제목 분리 및 정렬 */
+    div[data-testid="stExpander"] summary {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    div[data-testid="stExpander"] summary > span[data-testid="stExpanderToggleIcon"] {
+        min-width: 24px !important;
+        width: 24px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
     }
 
     /* 전체 앱 배경: 부드러운 밝은 오트밀(아이보리) 그라데이션 */
@@ -238,7 +285,7 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
     label[data-testid="stWidgetLabel"] span,
     div[data-testid="stRadio"] label span,
     div[data-testid="stCheckbox"] label span,
-    div[data-testid="stExpander"] summary span,
+    div[data-testid="stExpander"] summary span:not([data-testid*="Icon"]), 
     div[data-testid="stExpander"] summary p,
     div[data-testid="stStatusWidget"] *,
     .stTable th, .stTable td, table th, table td {
