@@ -232,6 +232,31 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         -webkit-text-fill-color: #FFFFFF !important;
     }
 
+    /* ── [상단 웰컴 히어로 배너 내부 텍스트 순백색(#FFFFFF) 영구 보장] ── */
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card *,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h1,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h2,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h3,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h4,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card p,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card span,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card div,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card b,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card strong,
+    div[data-testid="stMarkdownContainer"] .welcome-heading,
+    div[data-testid="stMarkdownContainer"] .welcome-subtext {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card .welcome-copilot-tag,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card .welcome-copilot-tag * {
+        color: #064E3B !important;
+        -webkit-text-fill-color: #064E3B !important;
+        background: #FFFFFF !important;
+    }
+
     /* ── [메트릭 줄임표(...) 방지 & 워드랩 가독성 최적화] ── */
     div[data-testid="stMetricValue"],
     div[data-testid="stMetricValue"] * {

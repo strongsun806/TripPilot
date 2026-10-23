@@ -1055,6 +1055,40 @@ def render_welcome_hero_banner_html(
     comp_clean = companion_choice.split()[1] if len(companion_choice.split()) > 1 else companion_choice
 
     raw_html = f"""
+    <style>
+    .trippilot-welcome-card,
+    .trippilot-welcome-card *,
+    .trippilot-welcome-card h1,
+    .trippilot-welcome-card h2,
+    .trippilot-welcome-card h3,
+    .trippilot-welcome-card h4,
+    .trippilot-welcome-card p,
+    .trippilot-welcome-card span,
+    .trippilot-welcome-card div,
+    .trippilot-welcome-card b,
+    .trippilot-welcome-card strong,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card *,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h1,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h2,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h3,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card h4,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card p,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card span,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card div,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card b,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card strong {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+    .trippilot-welcome-card .welcome-copilot-tag,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card .welcome-copilot-tag,
+    div[data-testid="stMarkdownContainer"] .trippilot-welcome-card .welcome-copilot-tag * {{
+        color: #064E3B !important;
+        -webkit-text-fill-color: #064E3B !important;
+        background: #FFFFFF !important;
+    }}
+    </style>
     <div class="trippilot-welcome-card" style="
         background: linear-gradient(135deg, #052317 0%, #0A3622 50%, #10442F 100%);
         border: 1.5px solid rgba(255, 255, 255, 0.45);
@@ -1072,7 +1106,7 @@ def render_welcome_hero_banner_html(
             <div style="display: flex; align-items: center; gap: 18px; max-width: 820px;">
                 <div style="position: relative; flex-shrink: 0;">
                     {img_tag}
-                    <span style="position: absolute; bottom: -4px; right: -4px; background: #FFFFFF; color: #064E3B !important; -webkit-text-fill-color: #064E3B !important; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 999px; border: 1.5px solid #064E3B; letter-spacing: 0.04em;">CO-PILOT</span>
+                    <span class="welcome-copilot-tag" style="position: absolute; bottom: -4px; right: -4px; background: #FFFFFF; color: #064E3B !important; -webkit-text-fill-color: #064E3B !important; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 999px; border: 1.5px solid #064E3B; letter-spacing: 0.04em;">CO-PILOT</span>
                 </div>
                 <div>
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap;">
@@ -1080,10 +1114,10 @@ def render_welcome_hero_banner_html(
                         <span style="background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.70); color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">🌍 100개 글로벌 인기 도시 실시간 RAG</span>
                         <span style="background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.70); color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">⚡ 무중단 병렬 추론</span>
                     </div>
-                    <h2 style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(20px, 2.2vw, 26px); font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; text-shadow: 0 2px 8px rgba(0,0,0,0.9);">
+                    <h2 class="welcome-heading" style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(20px, 2.2vw, 26px); font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; text-shadow: 0 2px 8px rgba(0,0,0,0.9);">
                         어디로 떠나고 싶으신가요? 나만의 감성 맞춤 여정 설계
                     </h2>
-                    <p style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(13px, 1.05vw, 14.5px); margin: 0; line-height: 1.6; text-shadow: 0 1px 4px rgba(0,0,0,0.85); font-weight: 600;">
+                    <p class="welcome-subtext" style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: clamp(13px, 1.05vw, 14.5px); margin: 0; line-height: 1.6; text-shadow: 0 1px 4px rgba(0,0,0,0.85); font-weight: 600;">
                         왼쪽 사이드바에서 <b style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; text-decoration: underline; font-weight: 800;">[1. 어디로 ➔ 2. 언제/얼마나 ➔ 3. 누구와/취향]</b> 3단계를 차례로 선택해 보세요.<br/>
                         공공 위키백과 고증 정보와 최단 동선 지도로 세상에 하나뿐인 나만의 여행 일정을 완성해 드려요! 🌿
                     </p>
