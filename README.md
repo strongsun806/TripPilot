@@ -13,7 +13,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](#)
 [![LangChain](https://img.shields.io/badge/LangGraph-RAG%20Workflow-green.svg?logo=langchain&logoColor=white)](#)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange.svg)](#)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.4--Nano-412991.svg?logo=openai&logoColor=white)](#)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.4--Mini-412991.svg?logo=openai&logoColor=white)](#)
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
 
 </div>
