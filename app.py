@@ -406,12 +406,15 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         border-color: #059669 !important;
     }
     .tori-mascot-avatar {
-        width: 48px !important;
-        height: 48px !important;
-        border-radius: 50% !important;
-        object-fit: cover !important;
-        border: 2px solid #10B981 !important;
+        width: 52px !important;
+        height: 52px !important;
+        object-fit: contain !important;
         display: block !important;
+        filter: drop-shadow(0 4px 10px rgba(6, 78, 59, 0.35)) !important;
+        transition: transform 0.25s ease !important;
+    }
+    .tori-mascot-wrapper:hover .tori-mascot-avatar {
+        transform: scale(1.15) rotate(6deg) !important;
     }
     .tori-mascot-info {
         display: flex !important;

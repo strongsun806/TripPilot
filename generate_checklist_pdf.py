@@ -267,7 +267,7 @@ html_content = """<!DOCTYPE html>
         <p><b>실패</b>: 실행했으나 기대와 다름 → 비고에 사유와 조치 &nbsp;|&nbsp; <b>미확인</b>: 실행하지 못함 → 비고에 사유</p>
         <p><b>해당없음</b>: 선택하지 않은 심화 항목, 해당하지 않는 도메인 항목</p>
         <p class="crit-warn">※ 확인하지 않은 것을 통과로 적지 않습니다.</p>
-        <p style="color:#64748B;">증빙 칸에는 캡처 파일명을 적고 제출물에 넣습니다. 캡처에 API 키와 오류 상세 내용이 보이지 않게 합니다.</p>
+        <p style="color:#64748B;">증빙 칸에는 캡처 파일명을 적고 제출물에 넣습니다. (표준 저장 경로: <b>docs/images/proof/</b>, 상세 안내: <b>docs/EVIDENCE_GUIDE.md</b>)</p>
       </div>
     </div>
 
@@ -296,7 +296,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">01_f2001_metadata_index_log.png</td>
+          <td class="col-proof">docs/images/proof/<br>01_f2001_metadata_index_log.png</td>
           <td class="col-note">JSON 로드 100건 = ChromaDB travel_meta 컬렉션 청크 100건 일치. 여행지명·국가·대륙·테마·예산·시즌·요약 7개 속성 모두 포함 확인.</td>
         </tr>
         <tr>
@@ -308,7 +308,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">02_f2002_idempotent_index.png</td>
+          <td class="col-proof">docs/images/proof/<br>02_f2002_idempotent_index.png</td>
           <td class="col-note">고유 ID(TRIP_1~100) 기반 Upsert 방식으로 index_metadata.py 재실행 시에도 100건 유지 확인.</td>
         </tr>
 
@@ -324,7 +324,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">03_f2003_f2004_wiki_collect.png</td>
+          <td class="col-proof">docs/images/proof/<br>03_f2003_f2004_wiki_collect.png</td>
           <td class="col-note">추출 키워드 5개 정상 확인. 선별 문서 5건(다낭, 바나힐 등) 색인, 무관 문서 10건(목도리도마뱀 등) 제외 구분 출력 확인.</td>
         </tr>
         <tr>
@@ -336,7 +336,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">04_f2004_cache_hit_log.png</td>
+          <td class="col-proof">docs/images/proof/<br>04_f2004_cache_hit_log.png</td>
           <td class="col-note">wiki_cache.json 캐시 적중 확인. 1회차 수집(5.2초) → 2회차 API 호출 생략(0.05초 즉시 벡터 검색 진입).</td>
         </tr>
         <tr>
@@ -348,7 +348,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">05_f2005_chunk_param_change.png</td>
+          <td class="col-proof">docs/images/proof/<br>05_f2005_chunk_param_change.png</td>
           <td class="col-note">config.py 및 슬라이더 변경: 1000/200(23개 청크) ↔ 500/50(37개 청크) 동적 변경 확인.</td>
         </tr>
       </tbody>
@@ -394,7 +394,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">06_f2006_topk_change.png</td>
+          <td class="col-proof">docs/images/proof/<br>06_f2006_topk_change.png</td>
           <td class="col-note">Top-k 슬라이더를 3에서 5로 변경 시 근거 문서 수가 1+3(4건)에서 1+5(6건)으로 확장 반영됨 확인.</td>
         </tr>
         <tr>
@@ -406,7 +406,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">07_f2007_langgraph_workflow.png</td>
+          <td class="col-proof">docs/images/proof/<br>07_f2007_langgraph_workflow.png</td>
           <td class="col-note">src/core_rag.py build_rag_graph()의 StateGraph retrieve → generate → END 2노드 그래프 구조 확인.</td>
         </tr>
         <tr>
@@ -418,7 +418,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">08_f2008_cited_sources_match.png</td>
+          <td class="col-proof">docs/images/proof/<br>08_f2008_cited_sources_match.png</td>
           <td class="col-note">답변 내 [근거 1], [근거 2] 표기와 하단 카드 번호 일치 및 [여행지 메타데이터], [한국어 위키백과] 뱃지 구분 확인.</td>
         </tr>
         <tr>
@@ -430,7 +430,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">09_f2007_unknown_fact_fallback.png</td>
+          <td class="col-proof">docs/images/proof/<br>09_f2007_unknown_fact_fallback.png</td>
           <td class="col-note">문서 외 질문 시 "제공된 문서에서 확인되지 않습니다" 방어 답변 생성 및 "ⓘ 답변에 인용된 근거가 없습니다" 안내 출력.</td>
         </tr>
 
@@ -446,7 +446,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">10_f2009_chat_separation.png</td>
+          <td class="col-proof">docs/images/proof/<br>10_f2009_chat_separation.png</td>
           <td class="col-note">messages_by_trip[trip_id] 구조로 여행지(도쿄↔파리) 변경 시 이전 대화 내역이 섞이지 않고 독립 유지됨 확인.</td>
         </tr>
         <tr>
@@ -458,7 +458,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">11_f2011_condition_filter.png</td>
+          <td class="col-proof">docs/images/proof/<br>11_f2011_condition_filter.png</td>
           <td class="col-note">"예산 100만원 이하 휴양지" 입력 시 메타데이터 필터링으로 조건 부합 여행지만 엄격 선별 및 카드 렌더링 확인.</td>
         </tr>
         <tr>
@@ -470,7 +470,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">12_f2010_itinerary_with_citations.png</td>
+          <td class="col-proof">docs/images/proof/<br>12_f2010_itinerary_with_citations.png</td>
           <td class="col-note">맞춤 2박3일 여행 일정표 및 팩트체크 검증 기능의 각 일정과 검증문에 [근거 N] 및 위키 출처 링크 동시 표기 확인.</td>
         </tr>
         <tr>
@@ -482,7 +482,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">13_f2012_status_and_errors.png</td>
+          <td class="col-proof">docs/images/proof/<br>13_f2012_status_and_errors.png</td>
           <td class="col-note">st.status로 실시간 단계별 진행 표시, 키 누락 시 st.error, 색인 0건 시 st.warning 안내 메시지 정상 표출.</td>
         </tr>
         <tr>
@@ -494,7 +494,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">14_f2012_travel_disclaimer.png</td>
+          <td class="col-proof">docs/images/proof/<br>14_f2012_travel_disclaimer.png</td>
           <td class="col-note">여행 도메인 면책 문구(비자·입국 규정, 치안, 외교부 여행경보 확인 안내) 사이드바 및 하단 상시 고지 확인.</td>
         </tr>
       </tbody>
@@ -540,7 +540,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/images/01_dashboard_main.png</td>
+          <td class="col-proof">docs/images/proof/<br>15_f2013_dashboard_ui.png</td>
           <td class="col-note">모던 반응형 CSS 글래스모피즘, 커스텀 Folium JS 동선 지도, 질문 입력창, 챗봇 대화창, 근거 아코디언 통합 구현.</td>
         </tr>
         <tr>
@@ -552,7 +552,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">16_f2014_similarity_vs_mmr.png</td>
+          <td class="col-proof">docs/images/proof/<br>16_f2014_similarity_vs_mmr.png</td>
           <td class="col-note">유사도 검색(특정 랜드마크 중복 청크 집중) ↔ MMR 검색(명소·문화·기후 등 다양한 관점 분산 청크) 비교 확인 완료.</td>
         </tr>
         <tr>
@@ -564,7 +564,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/3_검증결과_및_품질비교.md<br>(제3.3절 전후 비교표)</td>
+          <td class="col-proof">docs/images/proof/<br>17_f2015_rag_comparison_table.png</td>
           <td class="col-note">5대 대표 질문(도쿄 패스 범위, 바나힐 케이블카, 파리 뮤지엄 패스 등) 비RAG vs RAG 비교 및 환각 억제율 100% 기록.</td>
         </tr>
         <tr>
@@ -576,7 +576,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/3_검증결과_및_품질비교.md</td>
+          <td class="col-proof">docs/images/proof/<br>18_f2015_comparison_report.png</td>
           <td class="col-note">docs/3_검증결과_및_품질비교.md 내에 질문별 일반 LLM 답변 vs RAG 답변, 정답 일치도 상세 마크다운 표 수록 완료.</td>
         </tr>
         <tr>
@@ -588,7 +588,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">19_f2016_multi_source_distinction.png</td>
+          <td class="col-proof">docs/images/proof/<br>19_f2016_multi_source_distinction.png</td>
           <td class="col-note">근거 카드 상단에 [여행지 메타데이터](녹색 뱃지)와 [한국어 위키백과](파란 뱃지)로 다중 출처 유형 구분 표시 완료.</td>
         </tr>
 
@@ -604,7 +604,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">20_nf2001_response_time.png</td>
+          <td class="col-proof">docs/images/proof/<br>20_nf2001_response_time.png</td>
           <td class="col-note">첫 질문(위키 API 수집+색인 포함) 평균 4.8초, 두 번째 질문(캐시 적중+벡터 검색+생성) 평균 1.8초로 실시간 대화 원활.</td>
         </tr>
         <tr>
@@ -616,7 +616,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">21_nf2003_nf2004_security_check.png</td>
+          <td class="col-proof">docs/images/proof/<br>21_nf2003_nf2004_security_check.png</td>
           <td class="col-note">GitHub 커밋 및 소스 전체에 키 없음(.gitignore 등록). 예외 발생 시 시스템 프롬프트 및 Traceback 은닉 확인.</td>
         </tr>
         <tr>
@@ -628,7 +628,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">22_nf2005_modular_architecture.png</td>
+          <td class="col-proof">docs/images/proof/<br>22_nf2005_modular_architecture.png</td>
           <td class="col-note">make_data.py(데이터), collect_and_index_wiki.py(수집·색인), core_rag.py(검색·생성), app.py(UI) 모듈 분리 준수.</td>
         </tr>
         <tr>
@@ -640,7 +640,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">23_nf2006_api_etiquette.png</td>
+          <td class="col-proof">docs/images/proof/<br>23_nf2006_api_etiquette.png</td>
           <td class="col-note">User-Agent 헤더 연락처 명시 및 HTTP 429(Too Many Requests) 대비 지수 백오프 재시도 로직 구현 확인.</td>
         </tr>
       </tbody>
@@ -683,7 +683,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">README.md (라이선스 항목)</td>
+          <td class="col-proof">docs/images/proof/<br>24_nf2007_data_license_readme.png</td>
           <td class="col-note">한국어 위키백과(CC BY-SA 4.0 및 GFDL), 위키미디어 공용 사진 및 OpenAI 정책 준수 내용을 README에 명시 완료.</td>
         </tr>
 
@@ -699,7 +699,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/3_검증결과_및_품질비교.md</td>
+          <td class="col-proof">docs/images/proof/<br>25_mandatory_verification_matrix.png</td>
           <td class="col-note">필수 요구사항 12종 및 선택 심화(F2013, F2014, F2015, F2016) 전 항목 검증 통과 및 대조표 일치 확인.</td>
         </tr>
         <tr>
@@ -711,7 +711,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/images/ 폴더 내 파일 일체</td>
+          <td class="col-proof">docs/images/proof/<br>26_all_screenshots_attached.png</td>
           <td class="col-note">메인 대시보드(01), 동선 플래너(02), PDF 일정표(03), 경로 지도(04) 등 전 항목 대조 증빙 파일 첨부 완료.</td>
         </tr>
         <tr>
@@ -723,7 +723,7 @@ html_content = """<!DOCTYPE html>
             <span class="pass">☑ 통과</span><br>
             <span class="other">☐ 실패<br>☐ 미확인<br>☐ 해당없음</span>
           </td>
-          <td class="col-proof">docs/ 및 프로젝트 루트 디렉터리</td>
+          <td class="col-proof">docs/images/proof/<br>27_final_deliverables_package.png</td>
           <td class="col-note">docs/ 4대 산출물(1_요구사항정의서, 2_설계문서, 3_검증결과, 4_체크리스트) 및 README.md, src/, app.py 패키징 완료.</td>
         </tr>
       </tbody>
