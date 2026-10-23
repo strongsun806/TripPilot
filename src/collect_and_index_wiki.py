@@ -39,12 +39,15 @@ api_key = get_api_key()
 base_url = get_base_url()
 wiki_contact = get_wiki_contact()
 
-llm = ChatOpenAI(
-    model=CHAT_MODEL,
-    temperature=0.0,
-    openai_api_key=api_key or "missing_key",
-    openai_api_base=base_url,
-)
+llm_kwargs = {
+    "model": CHAT_MODEL,
+    "openai_api_key": api_key or "missing_key",
+    "openai_api_base": base_url,
+}
+if not any(k in CHAT_MODEL.lower() for k in ["luna", "o1", "o3"]):
+    llm_kwargs["temperature"] = 0.0
+
+llm = ChatOpenAI(**llm_kwargs)
 
 # 위키백과 API 호출 설정 (NF2006, NF2007 준수: User-Agent 헤더에 연락처 명시)
 WIKI_API_URL = "https://ko.wikipedia.org/w/api.php"
