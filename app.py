@@ -1634,6 +1634,33 @@ if "condition_results" not in st.session_state:
     st.session_state.condition_results = None
 if "itinerary_by_trip" not in st.session_state:
     st.session_state.itinerary_by_trip = {}
+
+# 🎬 기본 완성형 추천 일정 & 토리 대화 자동 프리로드 (초기 사용자 경험 및 완성도 극대화)
+if "1" not in st.session_state.itinerary_by_trip:
+    try:
+        import json as _demo_json
+        import os as _demo_os
+        if _demo_os.path.exists("data/demo_itinerary_tokyo.json"):
+            with open("data/demo_itinerary_tokyo.json", "r", encoding="utf-8") as _df:
+                _demo_data = _demo_json.load(_df)
+                st.session_state.itinerary_by_trip["1"] = _demo_data
+                st.session_state.itinerary_by_trip["0"] = _demo_data
+            _demo_msgs = [
+                {
+                    "role": "user",
+                    "content": "도쿄 2박 3일 코스로 짜줘! 감성 카페 위주로 부탁하고 생선 알러지가 있어서 해산물은 빼줘.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "안녕하세요! 🐣 AI 여행 코파일럿 토리예요. 친구들과 함께하는 도쿄 2박 3일 감성 카페 & 여유로운 힐링 일정을 맞춤 설계했습니다. 생선 알러지를 고려하여 해산물 코스는 완전히 배제하고, 아사쿠사 말차 카페, 오모테산도 가든 테라스, 와규 로컬 맛집 위주로 알차게 구성했어요! 우측 일정표와 1일차 동선 지도를 확인해 보세요. 🌿",
+                },
+            ]
+            st.session_state.messages_by_trip["1"] = _demo_msgs
+            st.session_state.messages_by_trip["0"] = _demo_msgs
+            st.session_state.chat_constraints_by_trip["1"] = ["생선 및 해산물 알러지 케어 코스 반영"]
+            st.session_state.chat_constraints_by_trip["0"] = ["생선 및 해산물 알러지 케어 코스 반영"]
+    except Exception:
+        pass
 if "chat_constraints_by_trip" not in st.session_state:
     st.session_state.chat_constraints_by_trip = {}
 if "vibe_override" not in st.session_state:

@@ -41,7 +41,7 @@ def get_wiki_contact() -> str:
 
 
 EMBEDDING_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-4o-mini"
+CHAT_MODEL = os.getenv("OPENAI_MODEL_NAME", "gpt-5.4-nano")
 
 # 4. 청킹 및 검색 하이퍼파라미터 설정 (2.5 검색 설정 설계: F2005, F2006, F2014)
 CHUNK_SIZE = int(os.getenv("TRIPPILOT_CHUNK_SIZE", "1000"))

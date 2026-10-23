@@ -13,7 +13,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](#)
 [![LangChain](https://img.shields.io/badge/LangGraph-RAG%20Workflow-green.svg?logo=langchain&logoColor=white)](#)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange.svg)](#)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991.svg?logo=openai&logoColor=white)](#)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5.4--Nano-412991.svg?logo=openai&logoColor=white)](#)
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
 
 </div>
@@ -105,7 +105,7 @@ flowchart TD
         RetrieveNode --> ChromaMeta[(ChromaDB: travel_meta)]
         RetrieveNode --> ChromaWiki[(ChromaDB: travel_wiki)]
         RetrieveNode --> MergeFilter[중복 제거 및 MMR 다양성 재순위화]
-        MergeFilter --> GenerateNode[Generate 노드: GPT-4o-mini]
+        MergeFilter --> GenerateNode[Generate 노드: GPT-5.4 Nano]
         GenerateNode --> Guardrail[가드레일 검증 및 근거 표기 파싱]
     end
 
@@ -169,6 +169,7 @@ pip install -r requirements.txt
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL_NAME=gpt-5.4-nano
 WIKI_CONTACT=trippilot_contact@example.com
 ```
 
