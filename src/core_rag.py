@@ -40,7 +40,7 @@ llm_kwargs = {
     "openai_api_base": base_url,
 }
 # gpt-6-luna 및 o1/o3 등 추론(Reasoning) 모델은 temperature 커스텀 지정 시 HTTP 400 에러 방지를 위해 기본값 유지
-if not any(k in CHAT_MODEL.lower() for k in ["luna", "o1", "o3"]):
+if not any(k in CHAT_MODEL.lower() for k in ["luna", "o1", "o3", "gpt-5-"]):
     llm_kwargs["temperature"] = 0.2
 
 llm = ChatOpenAI(**llm_kwargs)

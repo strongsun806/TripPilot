@@ -44,7 +44,7 @@ llm_kwargs = {
     "openai_api_key": api_key or "missing_key",
     "openai_api_base": base_url,
 }
-if not any(k in CHAT_MODEL.lower() for k in ["luna", "o1", "o3"]):
+if not any(k in CHAT_MODEL.lower() for k in ["luna", "o1", "o3", "gpt-5-"]):
     llm_kwargs["temperature"] = 0.0
 
 llm = ChatOpenAI(**llm_kwargs)

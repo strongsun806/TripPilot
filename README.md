@@ -169,7 +169,7 @@ pip install -r requirements.txt
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL_NAME=gpt-5.4-nano
+OPENAI_MODEL_NAME=gpt-5.4-mini
 WIKI_CONTACT=trippilot_contact@example.com
 ```
 
