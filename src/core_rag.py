@@ -1037,6 +1037,8 @@ def _clean_pdf_text(text: str) -> str:
     text = re.sub(r"\[근거\s*\d+(?:[,\s]*\d+)*\]", "", text)
     text = re.sub(r"\(근거\s*\d+(?:[,\s]*\d+)*\)", "", text)
     text = re.sub(r"\[\d+(?:[,\s]*\d+)*\]", "", text)
+    # 한글 폰트에 글리프가 없는 괄호 안 외래어 한자(예: (浅草寺), (秋葉原), (東京)) 자동 정리
+    text = re.sub(r"\([\u2e80-\u9fff]+\)", "", text)
     return _strip_emoji_for_pdf(text).strip()
 
 
@@ -1066,13 +1068,56 @@ def export_itinerary_pdf_bytes(
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    font_reg = r"C:\Windows\Fonts\malgun.ttf"
-    font_bold = r"C:\Windows\Fonts\malgunbd.ttf"
-    has_kr_font = os.path.exists(font_reg)
-    if has_kr_font:
-        pdf.add_font("Malgun", "", font_reg)
-        pdf.add_font("Malgun", "B", font_bold if os.path.exists(font_bold) else font_reg)
-        font_family = "Malgun"
+    # 멀티플랫폼 유니코드 한글 폰트 로드 (Streamlit Cloud 리눅스 컨테이너 및 윈도우/맥 완벽 지원)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_font_reg = os.path.join(base_dir, "assets", "fonts", "NanumGothic-Regular.ttf")
+    local_font_bold = os.path.join(base_dir, "assets", "fonts", "NanumGothic-Bold.ttf")
+
+    linux_reg_paths = [
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+        "/usr/share/fonts/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/opentype/nanum/NanumGothic.otf",
+    ]
+    linux_bold_paths = [
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
+        "/usr/share/fonts/nanum/NanumGothicBold.ttf",
+    ]
+    win_reg = r"C:\Windows\Fonts\malgun.ttf"
+    win_bold = r"C:\Windows\Fonts\malgunbd.ttf"
+
+    font_path_reg = None
+    font_path_bold = None
+
+    if os.path.exists(local_font_reg):
+        font_path_reg = local_font_reg
+        font_path_bold = local_font_bold if os.path.exists(local_font_bold) else local_font_reg
+    elif any(os.path.exists(p) for p in linux_reg_paths):
+        font_path_reg = next(p for p in linux_reg_paths if os.path.exists(p))
+        font_path_bold = next((p for p in linux_bold_paths if os.path.exists(p)), font_path_reg)
+    elif os.path.exists(win_reg):
+        font_path_reg = win_reg
+        font_path_bold = win_bold if os.path.exists(win_bold) else win_reg
+
+    # 비상 폴백: 폰트 파일 부재 시 Google Fonts CDN에서 자동 다운로드
+    if not font_path_reg:
+        try:
+            os.makedirs(os.path.join(base_dir, "assets", "fonts"), exist_ok=True)
+            import urllib.request
+            urllib.request.urlretrieve(
+                "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf",
+                local_font_reg,
+            )
+            font_path_reg = local_font_reg
+            font_path_bold = local_font_reg
+        except Exception:
+            font_path_reg = None
+
+    if font_path_reg:
+        pdf.add_font("KoreanFont", "", font_path_reg)
+        pdf.add_font("KoreanFont", "B", font_path_bold if font_path_bold else font_path_reg)
+        font_family = "KoreanFont"
     else:
         font_family = "Helvetica"
 
