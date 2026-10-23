@@ -51,6 +51,7 @@ from core_rag import (
     compare_destinations,
     get_monthly_packing_and_weather,
     safe_md,
+    clean_ai_artifacts,
 )
 import importlib
 import nature_visuals
@@ -1139,21 +1140,25 @@ def render_interactive_planner_panel(
     structured_plan = itin_data.get("structured_plan", {})
     days_list = structured_plan.get("days", [])
 
-    # 실시간 반영된 알러지·식이제한·맞춤 수정 배너 표시
-    dietary_note = str(structured_plan.get("dietary_care_note") or "").strip()
-    active_chat_constraints = st.session_state.get("chat_constraints_by_trip", {}).get(trip_id, [])
+    # 실시간 반영된 알러지·식이제한·맞춤 수정 배너 표시 (인공지능 어투 [근거 N] 및 ** 표시 완전 정제)
+    dietary_note = clean_ai_artifacts(str(structured_plan.get("dietary_care_note") or "").strip())
+    active_chat_constraints = [
+        clean_ai_artifacts(c)
+        for c in st.session_state.get("chat_constraints_by_trip", {}).get(trip_id, [])
+    ]
     if dietary_note or active_chat_constraints:
         care_bg = "#ECFDF5" if vibe_mode == "nature" else "rgba(0, 245, 212, 0.14)"
         care_border = "#10B981" if vibe_mode == "nature" else "#00F5D4"
         care_text_col = "#065F46" if vibe_mode == "nature" else "#00F5D4"
         notes_joined = dietary_note if dietary_note else " · ".join(active_chat_constraints)
+        notes_joined = clean_ai_artifacts(notes_joined)
         st.markdown(
             f"""
             <div style="background:{care_bg};border:1.5px solid {care_border};border-radius:14px;padding:10px 14px;margin-bottom:12px;">
                 <div style="font-size:12.5px;font-weight:800;color:{care_text_col};">
                     🛡️ 실시간 맞춤 케어 & 대화 수정 반영 완료
                 </div>
-                <div style="font-size:12px;margin-top:3px;opacity:0.92;">
+                <div style="font-size:12px;margin-top:3px;opacity:0.92;line-height:1.55;">
                     {html.escape(notes_joined)}
                 </div>
             </div>
@@ -2316,6 +2321,7 @@ graph LR
             # 대화 중 알러지·식이제한·일정 수정 요청이 감지되면 세션 상태에 누적 저장
             detected_constraint = extract_user_constraint(active_user_input)
             if detected_constraint:
+                detected_constraint = clean_ai_artifacts(detected_constraint)
                 prev_list = st.session_state.chat_constraints_by_trip.get(trip_id, [])
                 if detected_constraint not in prev_list:
                     prev_list.append(detected_constraint)

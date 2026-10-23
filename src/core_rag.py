@@ -44,6 +44,24 @@ llm = ChatOpenAI(
 CITE_REGEX = re.compile(r"\[근거\s*([\d,\s]+)\]")
 
 
+def clean_ai_artifacts(text: str) -> str:
+    """
+    사용자 화면(배너, 일정표, 요약)에 노출되는 문구에서 [근거 N] 인용 태그 및 ** 마크다운 표시를 완전히 제거하여
+    인공지능 특유의 기계적인 어투를 없애고 자연스럽고 친근한 텍스트로 정제합니다.
+    """
+    if not isinstance(text, str) or not text:
+        return text if text is not None else ""
+    # 1. [근거 N], [근거 1, 2], [근거1] 등 인용 태그 제거
+    cleaned = re.sub(r"\[근거\s*\d+(?:[,\s]*\d+)*\]", "", text)
+    # 2. **텍스트** 형태의 마크다운 볼드 기호 제거
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
+    cleaned = cleaned.replace("**", "")
+    # 3. 불필요한 연속 공백 정리
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned).strip()
+    return cleaned
+
+
+
 def safe_md(text: str) -> str:
     """
     마크다운 렌더링 시 물결표(~)가 2개 이상 들어갈 때
@@ -768,7 +786,7 @@ def generate_itinerary(
    - 단기(1~5일): 각 일차마다 오전/오후/저녁 총 3개 방문지(`schedule` 아이템)를 포함하십시오.
    - 중기(6~10일): 각 일차마다 주간 핵심 1~2개와 저녁 1개, 총 2~3개 방문지를 포함하십시오.
    - 장기/한달살기(11~30일): 각 일차마다 주간 1개와 저녁 1개(총 2개 슬롯)로 간결하게 작성하고, 각 스팟 설명은 1~2문장으로 압축하여 응답 토큰 한도를 초과하지 않도록 하십시오.
-3. 각 활동 설명(`activity`), 봇 인사말(`bot_message`), 여행 팁 문장 끝에는 참조한 문서 번호인 `[근거 1]`, `[근거 2]` 등을 자연스럽게 포함하십시오.
+3. 각 활동 설명(`activity`), 여행 팁 문장 끝에는 참조한 문서 번호인 `[근거 1]`, `[근거 2]` 등을 자연스럽게 포함하십시오. 단, `dietary_care_note`(맞춤 케어 요약)에는 `[근거 N]` 인용 태그나 마크다운 볼드(`**`) 기호를 절대 포함하지 말고 자연스럽고 편안한 일상 문장으로만 작성하십시오.
 4. 지도에 동선을 표시하기 위해 각 방문지(`place`)의 실제 위도(`lat`)와 경도(`lng`)를 서로 겹치지 않게 소수점 4자리 실수(float)로 정확히 기입하십시오.
 5. 출력은 반드시 파싱 가능한 순수 JSON 객체만 반환하십시오.
 
@@ -778,7 +796,7 @@ def generate_itinerary(
   "center_lat": 41.8826,
   "center_lng": -87.6226,
   "applied_style": "{pref_desc}",
-  "dietary_care_note": "알러지·식이제한·동선 배려 등 맞춤 케어 반영 요약 (예: '생선·해산물 알러지 반영 완료 — 수산시장/초밥 코스를 제외하고 현지 최상급 와규·징기스칸·라멘 및 디저트 명소로 대체')",
+  "dietary_care_note": "알러지·식이제한·동선 배려 등 맞춤 케어 반영 요약 (주의: [근거 N] 인용 태그나 ** 표시를 절대 포함하지 말고 '요청하신 해산물 코스를 제외하고 현지 로컬 맛집과 디저트 위주로 대체했습니다'처럼 자연스럽고 다정하게 작성)",
   "best_season_tip": "추천 여행 시기 및 기후 특징 요약 ([근거 N] 포함)",
   "budget_transport_tip": "예산 수준 및 현지 이동·교통 패스 팁 요약 ([근거 N] 포함)",
   "plan_b_tip": "우천 시 또는 돌발 상황 대비 실내 대체 코스/플랜 B 팁 ([근거 N] 포함)",
@@ -862,6 +880,10 @@ def generate_itinerary(
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
         structured_plan = json.loads(raw)
+        if structured_plan.get("dietary_care_note"):
+            structured_plan["dietary_care_note"] = clean_ai_artifacts(structured_plan["dietary_care_note"])
+        if structured_plan.get("bot_message"):
+            structured_plan["bot_message"] = clean_ai_artifacts(structured_plan["bot_message"])
     except Exception:
         structured_plan = {}
 
@@ -997,7 +1019,7 @@ def export_itinerary_pdf_bytes(
     budget = trip_item.get("budget_level", "")
     days_count = len(structured_plan.get("days", [])) or 3
     applied_style = structured_plan.get("applied_style", "맞춤형 여행 코스")
-    care_note = structured_plan.get("dietary_care_note", "")
+    care_note = clean_ai_artifacts(structured_plan.get("dietary_care_note", ""))
 
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -1161,7 +1183,7 @@ def export_itinerary_html_bytes(
     season = trip_item.get("best_season", "")
     budget = trip_item.get("budget_level", "")
     applied_style = structured_plan.get("applied_style", "맞춤형 여행 코스")
-    care_note = structured_plan.get("dietary_care_note", "")
+    care_note = clean_ai_artifacts(structured_plan.get("dietary_care_note", ""))
     city_links = structured_plan.get("city_links") or make_booking_links(dest_name, country)
     center_lat = structured_plan.get("center_lat") or 35.6762
     center_lng = structured_plan.get("center_lng") or 139.6503

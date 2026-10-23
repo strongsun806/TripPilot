@@ -8,6 +8,7 @@ import json
 import urllib.request
 import urllib.parse
 from typing import Dict, Any, Optional
+from src.core_rag import clean_ai_artifacts
 
 _TELEGRAPH_TOKEN: Optional[str] = None
 _MOBILE_URL_CACHE: Dict[str, str] = {}
@@ -22,7 +23,7 @@ def build_itinerary_markdown(
     summary_text = str(structured_plan.get("summary", "")).strip()
     best_season = str(structured_plan.get("best_season", "")).strip()
     budget = str(structured_plan.get("budget", "")).strip()
-    care_note = str(structured_plan.get("dietary_care_note", "")).strip()
+    care_note = clean_ai_artifacts(str(structured_plan.get("dietary_care_note", "")).strip())
     days = structured_plan.get("days", [])
 
     days_cnt = len(days) or 3
@@ -151,7 +152,7 @@ def publish_itinerary_to_telegraph(
         summary_text = str(structured_plan.get("summary", "")).strip()
         best_season = str(structured_plan.get("best_season", "")).strip()
         budget = str(structured_plan.get("budget", "")).strip()
-        care_note = str(structured_plan.get("dietary_care_note", "")).strip()
+        care_note = clean_ai_artifacts(str(structured_plan.get("dietary_care_note", "")).strip())
 
         nodes = [
             {"tag": "h3", "children": [f"✈️ [{country}] {dest_name} 맞춤 여행 일정표"]},
