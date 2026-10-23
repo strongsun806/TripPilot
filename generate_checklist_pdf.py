@@ -233,7 +233,7 @@ html_content = """<!DOCTYPE html>
   <div>
     <div class="top-meta">
       <span class="title">AI 코어 프로젝트 2회차 — 셀프 · 상호 체크리스트</span>
-      <span class="author-info">앱 작성자: <b>강태선 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>강태선</b></span>
+      <span class="author-info">앱 작성자: <b>권혜강 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>권혜강</b></span>
     </div>
 
     <div class="header-section">
@@ -249,15 +249,15 @@ html_content = """<!DOCTYPE html>
         </tr>
         <tr>
           <td class="label">앱 작성자</td>
-          <td><b>강태선</b> (TripPilot / strongsun806)</td>
+          <td><b>권혜강</b> (TripPilot / strongsun806)</td>
         </tr>
         <tr>
           <td class="label">점검자</td>
-          <td><b>강태선</b> (셀프 검증)</td>
+          <td><b>권혜강</b> (셀프 검증)</td>
         </tr>
         <tr>
           <td class="label">점검 일시</td>
-          <td><b>2026. 10. 23 (금)</b></td>
+          <td><b>2026. 10. 23 (금) 15:35</b></td>
         </tr>
       </table>
 
@@ -366,7 +366,7 @@ html_content = """<!DOCTYPE html>
   <div>
     <div class="top-meta">
       <span class="title">AI 코어 프로젝트 2회차 — 셀프 · 상호 체크리스트</span>
-      <span class="author-info">앱 작성자: <b>강태선 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>강태선</b></span>
+      <span class="author-info">앱 작성자: <b>권혜강 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>권혜강</b></span>
     </div>
 
     <table class="check-table">
@@ -512,7 +512,7 @@ html_content = """<!DOCTYPE html>
   <div>
     <div class="top-meta">
       <span class="title">AI 코어 프로젝트 2회차 — 셀프 · 상호 체크리스트</span>
-      <span class="author-info">앱 작성자: <b>강태선 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>강태선</b></span>
+      <span class="author-info">앱 작성자: <b>권혜강 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>권혜강</b></span>
     </div>
 
     <table class="check-table">
@@ -658,7 +658,7 @@ html_content = """<!DOCTYPE html>
   <div>
     <div class="top-meta">
       <span class="title">AI 코어 프로젝트 2회차 — 셀프 · 상호 체크리스트</span>
-      <span class="author-info">앱 작성자: <b>강태선 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>강태선</b></span>
+      <span class="author-info">앱 작성자: <b>권혜강 (TripPilot)</b> &nbsp;&nbsp;&nbsp;&nbsp; 점검자: <b>권혜강</b></span>
     </div>
 
     <table class="check-table">
