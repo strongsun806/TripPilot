@@ -23,10 +23,11 @@ PHOTO_DB = {
     # ── [해양 & 해변 & 에메랄드 라군] ──
     "tropical_beach": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e", # 에메랄드빛 백사장과 야자수
     "coastal_waves": "https://images.unsplash.com/photo-1505118380757-91f5f5632de0", # 투명한 에메랄드 해안 파도
-    "sunset_beach": "https://images.unsplash.com/photo-1519046904884-53103b34b206", # 노을빛으로 물든 해변
-    "coral_lagoon": "https://images.unsplash.com/photo-1540555700478-4be289fbecef", # 보라카이/세부 투명 산호 바다
+    "sunset_beach": "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869", # 지평선 너머 타오르는 황금빛 일몰
+    "coral_lagoon": "https://images.unsplash.com/photo-1544551763-46a013bb70d5", # 투명한 에메랄드빛 산호초와 열대어
     "island_cliff": "https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86", # 해안 절벽과 청록빛 바다
     "maldives_lagoon": "https://images.unsplash.com/photo-1514282401047-d79a71a590e8", # 몰디브 청정 라군
+    "coastal_cove": "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57", # 해안 절벽 비경과 청록빛 만
 
     # ── [산악 & 알프스 & 호수] ──
     "alpine_peaks": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b", # 웅장한 알프스 설산 고봉
@@ -40,8 +41,9 @@ PHOTO_DB = {
     "twilight_sky": "https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d", # 고요한 황혼녘
 
     # ── [감성 카페 & 자연 휴식처] ──
-    "garden_cafe": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb", # 꽃과 나무가 어우러진 가든 카페
-    "terrace_view": "https://images.unsplash.com/photo-1554118811-1e0d58224f24", # 녹음이 우거진 테라스 카페
+    "garden_cafe": "https://images.unsplash.com/photo-1559925393-8be0ec4767c8", # 감성적인 야외 테라스 & 식물 가든 카페
+    "terrace_view": "https://images.unsplash.com/photo-1782199600975-3cdc0b9117ba", # 바다와 자연이 내려다보이는 야외 테라스 쉼터
+    "resort_pool": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4", # 열대 정글 & 리조트 인피니티 풀 테라스
 
     # ── [주요 랜드마크 & 도시 자연 포토] ──
     "tokyo_city": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf", # 화사한 도쿄타워 & 푸른 도심 스카이라인
@@ -151,7 +153,7 @@ DESTINATION_CURATED = {
             {"title": "에메랄드빛 산호 해안", "url": PHOTO_DB["coral_lagoon"], "desc": "발밑이 훤히 비치는 투명한 남태평양 바다", "tag": "🤿 산호 바다"},
             {"title": "코우리대교 드라이브", "url": PHOTO_DB["tropical_beach"], "desc": "바다를 가로지르는 파노라마 오션뷰", "tag": "🚗 해안 도로"},
             {"title": "선셋 비치의 황혼", "url": PHOTO_DB["sunset_beach"], "desc": "파도 소리와 함께 저무는 붉은 석양", "tag": "🌅 선셋"},
-            {"title": "바다 앞 테라스 쉼터", "url": PHOTO_DB["garden_cafe"], "desc": "오키나와 소바와 바닷바람의 여유", "tag": "🍜 로컬 힐링"},
+            {"title": "바다 앞 테라스 쉼터", "url": PHOTO_DB["terrace_view"], "desc": "오키나와 소바와 바닷바람의 여유", "tag": "🍜 로컬 힐링"},
         ]
     },
     "제주도": {
@@ -450,6 +452,56 @@ THEME_FALLBACK_COLLECTIONS = {
 _VISUALS_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
+
+_VIEWFINDER_B64_CACHE: Dict[str, str] = {}
+
+def get_viewfinder_image_url(dest_name: str, idx: int, fallback_url: str) -> str:
+    """
+    고화질 실사 뷰파인더 이미지 로더:
+    1순위: 로컬 정밀 큐레이션 이미지 (assets/viewfinder/{key}_{idx}.jpg) Base64
+    2순위: 검증된 고화질 Unsplash 실사 URL
+    """
+    dest_key_map = {
+        "오키나와": "okinawa",
+        "교토": "kyoto",
+        "삿포로": "sapporo",
+        "서울": "seoul",
+        "파리": "paris",
+        "부산": "busan",
+        "제주도": "jeju",
+        "발리": "bali",
+    }
+    key = dest_key_map.get(dest_name)
+    if not key:
+        for k, v in dest_key_map.items():
+            if k in dest_name or dest_name in k:
+                key = v
+                break
+
+    if key:
+        cache_key = f"{key}_{idx}"
+        if cache_key in _VIEWFINDER_B64_CACHE:
+            return _VIEWFINDER_B64_CACHE[cache_key]
+
+        local_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "assets", "viewfinder", f"{key}_{idx}.jpg"
+        )
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                    data_url = f"data:image/jpeg;base64,{b64}"
+                    _VIEWFINDER_B64_CACHE[cache_key] = data_url
+                    return data_url
+            except Exception:
+                pass
+
+    if fallback_url.startswith("http") and "unsplash.com" in fallback_url and "?" not in fallback_url:
+        return fallback_url + "?auto=format&fit=crop&w=600&q=80"
+    return fallback_url
+
+
 def get_destination_visuals(trip_item: Dict[str, Any]) -> Dict[str, Any]:
     """
     여행지 메타데이터(이름, 테마, 국가, 요약 등)를 기반으로
@@ -473,9 +525,11 @@ def get_destination_visuals(trip_item: Dict[str, Any]) -> Dict[str, Any]:
             result["hero_url"] = result["hero"] + "?auto=format&fit=crop&w=1600&q=85"
             result["thumb_url"] = result["hero"] + "?auto=format&fit=crop&w=600&q=80"
             formatted_gallery = []
-            for spot in result["gallery"]:
+            for idx, spot in enumerate(result["gallery"]):
                 spot_copy = dict(spot)
-                spot_copy["img_url"] = spot_copy["url"] + "?auto=format&fit=crop&w=600&q=80"
+                resolved_img = get_viewfinder_image_url(curated_name, idx, spot_copy["url"])
+                spot_copy["img_url"] = resolved_img
+                spot_copy["url"] = resolved_img
                 formatted_gallery.append(spot_copy)
             result["gallery"] = formatted_gallery
             _VISUALS_CACHE[name] = result
@@ -504,7 +558,7 @@ def get_destination_visuals(trip_item: Dict[str, Any]) -> Dict[str, Any]:
         {
             "title": f"{name} {spot['title']}",
             "url": spot["url"],
-            "img_url": spot["url"] + "?auto=format&fit=crop&w=600&q=80",
+            "img_url": spot["url"] + ("?auto=format&fit=crop&w=600&q=80" if "?" not in spot["url"] else ""),
             "desc": spot["desc"],
             "tag": spot["tag"]
         }
@@ -678,7 +732,7 @@ def render_nature_gallery_html(visuals: Dict[str, Any], dest_name: str, vibe_mod
         cards_html += f"""
         <div class="gallery-spot-card vibe-{vibe_mode}" style="{pal['card_bg']} {pal['card_border']} border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 14px rgba(15,41,30,0.06);">
             <div class="gallery-spot-img-wrap" style="position:relative; width:100%; height:135px; overflow:hidden; border-radius:16px 16px 0 0;">
-                <img src="{item.get('url', '')}" alt="{item.get('title', '')}" class="gallery-spot-img" loading="lazy" style="width:100% !important; height:135px !important; max-height:135px !important; object-fit:cover !important; display:block !important;" />
+                <img src="{item.get('img_url') or item.get('url', '')}" alt="{item.get('title', '')}" class="gallery-spot-img" loading="lazy" style="width:100% !important; height:135px !important; max-height:135px !important; object-fit:cover !important; display:block !important;" />
                 <span class="gallery-spot-badge" style="{pal['badge_bg']} {pal['badge_color']} {pal['badge_border']} position:absolute; top:8px; left:8px; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; backdrop-filter:blur(4px);">{item.get('tag', '🌿 힐링')}</span>
             </div>
             <div class="gallery-spot-body" style="padding:10px 12px; display:flex; flex-direction:column; gap:3px;">
