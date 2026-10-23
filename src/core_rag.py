@@ -1249,7 +1249,19 @@ def export_itinerary_html_bytes(
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-    * {{ box-sizing: border-box; font-family: 'Pretendard', sans-serif; }}
+    @font-face {{
+        font-family: 'Yidstreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetB.woff2') format('woff2');
+        font-weight: 700;
+        font-display: swap;
+    }}
+    @font-face {{
+        font-family: 'Yidstreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetL.woff2') format('woff2');
+        font-weight: 300;
+        font-display: swap;
+    }}
+    * {{ box-sizing: border-box; font-family: 'Yidstreet', 'Pretendard', sans-serif; }}
     body {{ margin: 0; padding: 24px; background: #F4FBF7; color: #0F291E; max-width: 980px; margin-inline: auto; }}
     .top-bar {{ display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }}
     .print-btn {{ background: #059669; color: #FFF; border: none; padding: 10px 18px; border-radius: 999px; font-weight: 800; cursor: pointer; font-size: 13px; }}

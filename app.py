@@ -138,6 +138,49 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
     """
     css_and_bg = """
     <style>
+    /* ── [눈누 Y이드스트릿체 (Yidstreet / Ydestreet / Y이든스트릿) 웹폰트 CDN] ── */
+    @font-face {
+        font-family: 'Yidstreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetL.woff2') format('woff2');
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'Yidstreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetB.woff2') format('woff2');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'Ydestreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetL.woff2') format('woff2');
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'Ydestreet';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetB.woff2') format('woff2');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'Y이든스트릿';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetB.woff2') format('woff2');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'Y이든스트릿';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2110@1.0/YdestreetL.woff2') format('woff2');
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+    }
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
 
@@ -149,9 +192,12 @@ def inject_theme_css_and_background(vibe_mode: str = "nature", dest_name: str = 
         --text-color: #0F291E !important;
     }
 
-    html, body, [class*="css"] {
-        font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-        color: #0F291E !important;
+    html, body, [class*="css"], .stApp,
+    button, input, select, textarea,
+    div[data-testid*="st"], [data-baseweb],
+    h1, h2, h3, h4, h5, h6, p, span, a, label {
+        font-family: 'Yidstreet', 'Ydestreet', 'Y이든스트릿', 'Pretendard', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+        color: #0F291E;
         scroll-behavior: smooth !important;
     }
 
@@ -793,7 +839,7 @@ def render_gdm_style_route_map_html(
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
-            * {{ box-sizing: border-box; font-family: 'Pretendard', -apple-system, sans-serif; }}
+            * {{ box-sizing: border-box; font-family: 'Yidstreet', 'Ydestreet', 'Pretendard', -apple-system, sans-serif !important; }}
             body {{ margin: 0; padding: 0; background: transparent; }}
             .map-card {{
                 background: {card_bg};
@@ -924,7 +970,7 @@ def render_gdm_style_route_map_html(
                     iconAnchor: [15, 15],
                     popupAnchor: [0, -16]
                 }});
-                var popupHtml = '<div style="font-family:Pretendard,sans-serif;min-width:185px;line-height:1.45;">' +
+                var popupHtml = '<div style="font-family:Yidstreet,Pretendard,sans-serif;min-width:185px;line-height:1.45;">' +
                     '<div style="font-weight:800;font-size:13px;color:#0F172A;">[' + s.day + '일차] ' + s.name + '</div>' +
                     '<div style="font-size:11px;color:#059669;font-weight:700;margin-top:2px;">⏰ ' + s.time + '</div>' +
                     '<div style="margin-top:6px;display:flex;gap:8px;">' +
